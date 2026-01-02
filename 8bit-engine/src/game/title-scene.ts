@@ -9,6 +9,9 @@ import { SceneManager } from './scenes'
 import { NES_PALETTE } from '../engine/palette'
 import { Input } from '../engine/input'
 import { createBitmapText, BitmapTextStyles } from '../engine/bitmap-font'
+import { createButton } from '../engine/ui-components'
+import type { Button } from '../engine/ui-components'
+import { ClickHandler } from '../engine/click-handler'
 
 export function createTitleScene(
   threeScene: THREE.Scene,
@@ -18,9 +21,8 @@ export function createTitleScene(
   sceneManager: SceneManager
 ): Scene {
   let titleText: THREE.Group
-  let pressStartText: THREE.Group
-  let pressStartBorder: THREE.Mesh
-  let pressStartBackground: THREE.Mesh
+  let pressStartButton: Button
+  let clickHandler: ClickHandler
   let blinkTimer = 0
   let stars: THREE.Mesh[] = []
 
@@ -59,40 +61,24 @@ export function createTitleScene(
       titleText.position.set(0, 2, 0)
       threeScene.add(titleText)
 
-      // "Press Start" text - using bitmap text
-      pressStartText = createBitmapText('PRESS START', BitmapTextStyles.subtitle(NES_PALETTE.WHITE))
-      pressStartText.position.set(0, -2, 0)
-      threeScene.add(pressStartText)
+      // "Press Start" button with click handler
+      pressStartButton = createButton({
+        text: 'PRESS START',
+        textColor: NES_PALETTE.WHITE,
+        backgroundColor: NES_PALETTE.DARK_BLUE,
+        borderColor: NES_PALETTE.CYAN,
+        padding: 0.2,
+        borderThickness: 0.08,
+        textStyle: BitmapTextStyles.subtitle(NES_PALETTE.WHITE),
+        onClick: () => {
+          sceneManager.switchTo('map')
+        },
+      })
+      pressStartButton.setPosition(0, -2, 0)
+      threeScene.add(pressStartButton.group)
 
-      // Calculate text width: "PRESS START" = 11 chars
-      // scale = 0.1, char width = 8 pixels, letterSpacing = 0.02
-      const charCount = 11
-      const charWidth = 8 * 0.1  // 8 pixels * scale
-      const spacing = 0.02
-      const textWidth = (charCount * charWidth) + ((charCount - 1) * spacing)
-      const textHeight = 8 * 0.1  // Full 8 pixels tall * scale (to contain descenders like 'p')
-
-      // Text is positioned from top-left, so we need to shift the box down by half its height
-      const boxYOffset = -textHeight / 2
-
-      // "Press Start" background box (slightly larger than text)
-      const padding = 0.2
-      const bgGeo = new THREE.PlaneGeometry(textWidth + padding * 2, textHeight + padding * 2)
-      const bgMat = new THREE.MeshBasicMaterial({ color: NES_PALETTE.DARK_BLUE })
-      pressStartBackground = new THREE.Mesh(bgGeo, bgMat)
-      pressStartBackground.position.set(0, -2 + boxYOffset, -0.1)
-      threeScene.add(pressStartBackground)
-
-      // "Press Start" border (slightly larger than background)
-      const borderThickness = 0.08
-      const borderGeo = new THREE.PlaneGeometry(
-        textWidth + padding * 2 + borderThickness * 2,
-        textHeight + padding * 2 + borderThickness * 2
-      )
-      const borderMat = new THREE.MeshBasicMaterial({ color: NES_PALETTE.CYAN })
-      pressStartBorder = new THREE.Mesh(borderGeo, borderMat)
-      pressStartBorder.position.set(0, -2 + boxYOffset, -0.2)
-      threeScene.add(pressStartBorder)
+      // Initialize click handler
+      clickHandler = new ClickHandler(camera, threeScene, renderer.domElement)
 
       // Decorative blocks (like a logo)
       const colors = [NES_PALETTE.RED, NES_PALETTE.GREEN, NES_PALETTE.BLUE, NES_PALETTE.CYAN]
@@ -110,20 +96,17 @@ export function createTitleScene(
 
     exit() {
       stars = []
+      if (clickHandler) {
+        clickHandler.destroy()
+      }
     },
 
     update(dt: number) {
-      // Blink "Press Start" with border and background
+      // Blink "Press Start" button
       blinkTimer += dt
       const isVisible = Math.floor(blinkTimer * 2) % 2 === 0
-      if (pressStartText) {
-        pressStartText.visible = isVisible
-      }
-      if (pressStartBorder) {
-        pressStartBorder.visible = isVisible
-      }
-      if (pressStartBackground) {
-        pressStartBackground.visible = isVisible
+      if (pressStartButton) {
+        pressStartButton.setVisible(isVisible)
       }
 
       // Animate title
@@ -136,7 +119,7 @@ export function createTitleScene(
         star.visible = Math.sin(blinkTimer * 3 + i) > -0.3
       })
 
-      // Check for start
+      // Check for start (keyboard)
       if (input.justPressed('start') || input.justPressed('a')) {
         sceneManager.switchTo('map')
       }

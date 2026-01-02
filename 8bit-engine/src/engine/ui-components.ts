@@ -22,6 +22,7 @@ export interface ButtonOptions {
   padding?: number
   borderThickness?: number
   textStyle?: BitmapTextOptions
+  onClick?: () => void
 }
 
 export interface Button {
@@ -29,6 +30,8 @@ export interface Button {
   text: THREE.Group
   background: THREE.Mesh
   border: THREE.Mesh
+  hitArea: THREE.Mesh  // Invisible mesh for click detection
+  onClick?: () => void
   setVisible: (visible: boolean) => void
   setPosition: (x: number, y: number, z?: number) => void
   destroy: () => void
@@ -90,11 +93,29 @@ export function createButton(options: ButtonOptions): Button {
   border.position.set(0, boxYOffset, -0.2)
   group.add(border)
 
+  // Hit area - invisible mesh for click detection
+  const hitAreaGeo = new THREE.PlaneGeometry(
+    textWidth + padding * 2 + borderThickness * 2,
+    textHeight + padding * 2 + borderThickness * 2
+  )
+  const hitAreaMat = new THREE.MeshBasicMaterial({
+    visible: false,
+    transparent: true,
+    opacity: 0,
+  })
+  const hitArea = new THREE.Mesh(hitAreaGeo, hitAreaMat)
+  hitArea.position.set(0, boxYOffset, 0.1)
+  hitArea.userData.isButton = true
+  hitArea.userData.onClick = options.onClick
+  group.add(hitArea)
+
   return {
     group,
     text: textMesh,
     background,
     border,
+    hitArea,
+    onClick: options.onClick,
     setVisible: (visible: boolean) => {
       group.visible = visible
     },
