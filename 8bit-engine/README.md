@@ -19,6 +19,7 @@ A TypeScript game engine built on Three.js with authentic NES-style constraints 
 
 - **Bitmap Font System**: Pixel-perfect 8×8 character rendering (A-Z, 0-9, punctuation)
 - **UI Components**: Pre-built buttons, labels, menus, text boxes, and title cards
+- **Sprite System**: NES-authentic OAM with 64 sprites, 8×8 patterns, meta-sprites
 - **Click Handler**: Mouse interaction with raycasting for UI elements
 - **Color Palette**: Authentic NES color palette with 30+ colors
 
@@ -327,6 +328,76 @@ worldMap.completeNode('level1')
 - `start` - Starting point (blue)
 - `goal` - Final destination (yellow)
 
+### Sprite System
+
+NES-authentic sprite system with hardware constraints (OAM).
+
+```typescript
+import {
+  SpriteManager,
+  createDefaultSpritePalettes,
+  MetaSpriteObject
+} from './engine'
+
+// Initialize sprite system
+const palettes = createDefaultSpritePalettes()
+const spriteManager = new SpriteManager(scene, palettes)
+const patternTable = spriteManager.getPatternTable()
+
+// Create an 8×8 sprite pattern
+patternTable.createPatternFromString(0, [
+  '00111100',  // 0 = transparent
+  '01222210',  // 1-3 = palette colors
+  '12333321',
+  '12333321',
+  '12333321',
+  '12333321',
+  '01222210',
+  '00111100'
+])
+
+// Create a sprite
+const sprite = spriteManager.createSprite({
+  x: 128,           // X position (0-255)
+  y: 120,           // Y position (0-239)
+  tileIndex: 0,     // Pattern index
+  paletteIndex: 0,  // Palette (0-3)
+  flipX: false,
+  flipY: false
+})
+
+// Update sprite
+sprite.update({ x: 130, y: 122 })
+
+// Create meta-sprite (16×16 character from 4 tiles)
+const playerMetaSprite = {
+  width: 2,
+  height: 2,
+  frames: [{
+    sprites: [
+      { offsetX: 0, offsetY: 0, tileIndex: 10 },
+      { offsetX: 8, offsetY: 0, tileIndex: 11 },
+      { offsetX: 0, offsetY: 8, tileIndex: 12 },
+      { offsetX: 8, offsetY: 8, tileIndex: 13 }
+    ]
+  }]
+}
+
+const player = new MetaSpriteObject(spriteManager, playerMetaSprite)
+player.setPosition(128, 120)
+player.setFrame(0)
+player.setFlip(true, false)  // Face left
+```
+
+**Hardware Limits:**
+- Maximum 64 sprites on screen
+- Maximum 8 sprites per scanline
+- 8×8 pixel sprites
+- 4 colors per sprite (including transparency)
+- 4 sprite palettes
+
+See [SPRITES.md](./SPRITES.md) for detailed documentation.
+
 ### Screen System
 
 Manage game states with lifecycle hooks and stack-based navigation.
@@ -411,7 +482,9 @@ Following NES hardware limitations for authentic retro feel:
 - **Tile Size**: 8×8 pixels
 - **Frame Rate**: 60 FPS
 - **Color Palette**: Limited NES palette
-- **Sprite Limit**: No enforced limit (modern hardware)
+- **Sprites**: 64 max on screen, 8 per scanline
+- **Sprite Size**: 8×8 pixels
+- **Sprite Palettes**: 4 palettes with 3 colors + transparency
 - **Audio**: Not yet implemented
 
 Access constraints programmatically:
@@ -437,6 +510,7 @@ console.log(TECHNICAL_CONSTRAINTS.TARGET_FPS) // 60
 │   │   ├── input.ts         # Input system
 │   │   ├── palette.ts       # NES colors
 │   │   ├── screen.ts        # Screen management
+│   │   ├── sprite.ts        # Sprite system (OAM)
 │   │   ├── ui-components.ts # UI library
 │   │   ├── world-map.ts     # Map navigation
 │   │   └── index.ts         # Engine exports
@@ -451,6 +525,7 @@ console.log(TECHNICAL_CONSTRAINTS.TARGET_FPS) // 60
 │   │   └── bitmap-font.test.ts
 │   └── main.ts              # Entry point
 ├── public/                  # Static assets
+├── SPRITES.md              # Sprite system guide
 ├── TESTING.md              # Test documentation
 ├── WORLD_MAP.md            # WorldMap guide
 ├── package.json
@@ -506,6 +581,14 @@ See the included 8BIT QUEST demo (`src/game/`) for a full example including:
 - Level progression system
 - UI components in action
 
+### Sprite System Example
+
+See [SPRITES.md](./SPRITES.md) for detailed sprite system documentation including:
+- Pattern creation and animation
+- Meta-sprite characters
+- Hardware constraint handling
+- Complete code examples
+
 ### WorldMap Example
 
 See [WORLD_MAP.md](./WORLD_MAP.md) for detailed WorldMap usage and examples.
@@ -556,12 +639,14 @@ Use Screens for cleaner code and better lifecycle management.
 ## Roadmap
 
 Future enhancements:
+- [x] ~~Sprite system (NES OAM)~~ ✅ Complete!
 - [ ] Audio system (NES-style chip tunes)
-- [ ] Sprite animation system
-- [ ] Tilemap renderer
+- [ ] 8×16 sprite support
+- [ ] Tilemap renderer with scrolling
 - [ ] Particle effects
 - [ ] Save/load system
 - [ ] Gamepad support
+- [ ] Collision detection helpers
 - [ ] More UI components (sliders, progress bars)
 - [ ] Visual scene editor
 
