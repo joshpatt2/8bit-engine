@@ -105,6 +105,11 @@ export class WorldMap {
   private pathObjects: THREE.Line[] = []
   private playerMarker?: THREE.Mesh
   
+  // Sprite animation
+  private spriteFrameIndex: number = 0
+  private spriteAnimTimer: number = 0
+  private readonly SPRITE_ANIM_SPEED: number = 0.3 // seconds per frame
+  
   // Navigation
   private availableDirections: Set<string> = new Set()
   private moveTimer: number = 0
@@ -240,15 +245,22 @@ export class WorldMap {
    * Create player marker
    */
   private createPlayerMarker(): void {
-    // Load corgi texture for player sprite
+    // Load corgi sprite sheet (2x2 grid: 4 frames)
     const textureLoader = new THREE.TextureLoader()
     
     textureLoader.load(
-      '/src/game/sprites/player/corgi.png',
+      '/src/game/sprites/player/corgi_4x4_left_ear_anim.png',
       (texture) => {
         // Configure texture for pixel-perfect rendering
         texture.magFilter = THREE.NearestFilter
         texture.minFilter = THREE.NearestFilter
+        texture.wrapS = THREE.RepeatWrapping
+        texture.wrapT = THREE.RepeatWrapping
+        
+        // Set up for 2x2 sprite sheet (show one quarter at a time)
+        // Each frame is 0.5 x 0.5 of the texture
+        texture.repeat.set(0.5, 0.5)
+        texture.offset.set(0, 0.5) // Start with top-left frame (frame 0)
         
         // Create sprite with corgi texture
         const geometry = new THREE.PlaneGeometry(1.5, 1.5)
@@ -269,7 +281,7 @@ export class WorldMap {
       },
       undefined,
       (error) => {
-        console.error('Error loading corgi texture:', error)
+        console.error('Error loading corgi sprite sheet:', error)
         // Fallback to colored box if texture fails to load
         this.createFallbackPlayerMarker()
       }
@@ -369,6 +381,28 @@ export class WorldMap {
    */
   public update(deltaTime: number, input: Input): void {
     this.moveTimer += deltaTime
+    this.spriteAnimTimer += deltaTime
+    
+    // Animate sprite frames (cycle through 4 frames)
+    if (this.spriteAnimTimer >= this.SPRITE_ANIM_SPEED) {
+      this.spriteAnimTimer = 0
+      this.spriteFrameIndex = (this.spriteFrameIndex + 1) % 4
+      
+      // Update texture offset based on frame (2x2 grid)
+      // Frame layout: [0][1]
+      //               [2][3]
+      if (this.playerMarker && this.playerMarker.material instanceof THREE.MeshBasicMaterial) {
+        const texture = this.playerMarker.material.map
+        if (texture) {
+          const col = this.spriteFrameIndex % 2  // 0 or 1
+          const row = Math.floor(this.spriteFrameIndex / 2)  // 0 or 1
+          
+          // Set texture offset (origin is bottom-left in Three.js)
+          texture.offset.x = col * 0.5
+          texture.offset.y = (1 - row) * 0.5 - 0.5  // Flip Y coordinate
+        }
+      }
+    }
     
     // Animate player marker (bounce)
     if (this.playerMarker) {
