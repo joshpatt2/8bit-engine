@@ -1,6 +1,6 @@
 /**
  * Map Scene
- * World map with 3 selectable levels (SMB3-style)
+ * World map with selectable levels using new WorldMap abstraction
  */
 
 import * as THREE from 'three'
@@ -8,6 +8,8 @@ import type { Scene, SceneType } from './scenes'
 import { SceneManager } from './scenes'
 import { NES_PALETTE } from '../engine/palette'
 import { Input } from '../engine/input'
+import { WorldMap, type WorldMapConfig, type MapNode } from '../engine/world-map'
+import { createLabel } from '../engine/ui-components'
 
 export interface LevelStatus {
   level1: 'locked' | 'unlocked' | 'complete'
@@ -21,46 +23,26 @@ export function createMapScene(
   renderer: THREE.WebGLRenderer,
   input: Input,
   sceneManager: SceneManager,
-  _levelStatus: LevelStatus
+  levelStatus: LevelStatus
 ): Scene {
-  let playerMarker: THREE.Mesh
-  let levelNodes: THREE.Mesh[] = []
-  let pathSegments: THREE.Mesh[] = []
-  let currentSelection = 0
-  let moveTimer = 0
-
-  const levelPositions = [
-    { x: -4, y: -2 },  // Level 1: Plains
-    { x: 0, y: 1 },    // Level 2: Cave
-    { x: 4, y: -1 },   // Level 3: Castle
-  ]
-
-  const levelColors = [
-    NES_PALETTE.GREEN,   // Plains
-    NES_PALETTE.PURPLE,  // Cave
-    NES_PALETTE.GRAY,    // Castle
-  ]
+  let worldMap: WorldMap | undefined
+  let levelNameLabel: ReturnType<typeof createLabel> | undefined
 
   return {
     name: 'map' as SceneType,
 
     enter() {
-      // Clear scene
       while (threeScene.children.length > 0) {
         threeScene.remove(threeScene.children[0])
       }
 
-      levelNodes = []
-      pathSegments = []
-
       // Green background (like SMB3 world map)
       threeScene.background = new THREE.Color(NES_PALETTE.LIME)
 
-      // Ambient light
       const light = new THREE.AmbientLight(0xffffff, 1)
       threeScene.add(light)
 
-      // Ground texture (grass tiles)
+      // Ground texture (grass tiles in checkered pattern)
       for (let x = -8; x <= 8; x += 2) {
         for (let y = -6; y <= 6; y += 2) {
           const tileGeo = new THREE.PlaneGeometry(1.8, 1.8)
@@ -72,13 +54,78 @@ export function createMapScene(
         }
       }
 
-      // Draw paths between levels
+      const nodes: MapNode[] = [
+        {
+          id: 'start',
+          name: 'START',
+          type: 'start',
+          status: 'complete',
+          position: { x: -4, y: -2 },
+          connections: ['level1']
+        },
+        {
+          id: 'level1',
+          name: 'LEVEL 1: PLAINS',
+          type: 'level',
+          status: 'unlocked',  // Always start unlocked
+          position: { x: -1, y: 1 },
+          connections: ['level2'],
+          color: NES_PALETTE.BLUE,
+          onSelect: () => {
+            sceneManager.switchTo('level1')
+          }
+        },
+        {
+          id: 'level2',
+          name: 'LEVEL 2: CAVE',
+          type: 'level',
+          status: levelStatus.level2,
+          position: { x: 2, y: -1 },
+          connections: ['level3'],
+          color: NES_PALETTE.PURPLE,
+          onSelect: () => {
+            sceneManager.switchTo('level2')
+          }
+        },
+        {
+          id: 'level3',
+          name: 'LEVEL 3: CASTLE',
+          type: 'boss',
+          status: levelStatus.level3,
+          position: { x: 5, y: 1 },
+          connections: [],
+          color: NES_PALETTE.GRAY,
+          onSelect: () => {
+            sceneManager.switchTo('level3')
+          }
+        }
+      ]
+
+      const mapConfig: WorldMapConfig = {
+        nodes,
+        startNodeId: 'start',
+        backgroundColor: NES_PALETTE.LIME,
+        pathColor: NES_PALETTE.TAN,
+        playerColor: NES_PALETTE.RED,
+        showLockedPaths: true
+      }
+
+      worldMap = new WorldMap(threeScene, mapConfig)
+
+      // Draw dotted paths between levels
+      const levelPositions = [
+        { x: -4, y: -2 },  // Start
+        { x: -1, y: 1 },   // Level 1
+        { x: 2, y: -1 },   // Level 2
+        { x: 5, y: 1 },    // Level 3
+      ]
+      
       for (let i = 0; i < levelPositions.length - 1; i++) {
         const start = levelPositions[i]
         const end = levelPositions[i + 1]
 
-        // Simple path segments
-        const segments = 5
+        // Create dotted path with small segments
+        const segments = 8
         for (let s = 0; s < segments; s++) {
           const t = s / segments
           const x = start.x + (end.x - start.x) * t
@@ -89,35 +136,10 @@ export function createMapScene(
           const dot = new THREE.Mesh(dotGeo, dotMat)
           dot.position.set(x, y, 0)
           threeScene.add(dot)
-          pathSegments.push(dot)
         }
       }
 
-      // Create level nodes
-      levelPositions.forEach((pos, i) => {
-        const nodeGeo = new THREE.BoxGeometry(1.2, 1.2, 0.5)
-        const nodeMat = new THREE.MeshBasicMaterial({ color: levelColors[i] })
-        const node = new THREE.Mesh(nodeGeo, nodeMat)
-        node.position.set(pos.x, pos.y, 0)
-        threeScene.add(node)
-        levelNodes.push(node)
-
-        // Add level number indicator
-        const numGeo = new THREE.BoxGeometry(0.4, 0.4, 0.3)
-        const numMat = new THREE.MeshBasicMaterial({ color: NES_PALETTE.WHITE })
-        const num = new THREE.Mesh(numGeo, numMat)
-        num.position.set(pos.x, pos.y + 0.8, 0.2)
-        threeScene.add(num)
-      })
-
-      // Player marker (like Mario on world map)
-      const markerGeo = new THREE.BoxGeometry(0.6, 0.8, 0.6)
-      const markerMat = new THREE.MeshBasicMaterial({ color: NES_PALETTE.RED })
-      playerMarker = new THREE.Mesh(markerGeo, markerMat)
-      playerMarker.position.set(levelPositions[0].x, levelPositions[0].y + 0.5, 0.3)
-      threeScene.add(playerMarker)
-
-      // Decorations - trees
+      // Add palm tree decorations
       const treePositions = [
         { x: -6, y: 3 }, { x: 6, y: 2 }, { x: -2, y: -3 },
         { x: 5, y: -4 }, { x: -5, y: -1 }
@@ -130,7 +152,7 @@ export function createMapScene(
         trunk.position.set(pos.x, pos.y - 0.2, 0)
         threeScene.add(trunk)
 
-        // Tree top
+        // Tree top (palm fronds)
         const topGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8)
         const topMat = new THREE.MeshBasicMaterial({ color: NES_PALETTE.DARK_GREEN })
         const top = new THREE.Mesh(topGeo, topMat)
@@ -138,50 +160,43 @@ export function createMapScene(
         threeScene.add(top)
       })
 
-      currentSelection = 0
-      moveTimer = 0
+      // Level name label (bottom of screen)
+      levelNameLabel = createLabel({
+        text: 'WORLD MAP',
+        color: NES_PALETTE.WHITE,
+        scale: 0.12
+      })
+      levelNameLabel.setPosition(0, -5.5, 10)
+      threeScene.add(levelNameLabel.group)
+
+      // Reset camera to default position
+      camera.position.set(0, 0, 10)
     },
 
     exit() {
-      levelNodes = []
-      pathSegments = []
+      worldMap?.destroy()
+      levelNameLabel?.destroy()
     },
 
     update(dt: number) {
-      moveTimer += dt
+      if (!worldMap) return
 
-      // Navigate between levels
-      if (input.justPressed('right') && currentSelection < 2) {
-        currentSelection++
+      worldMap.update(dt, input)
+
+      const currentNode = worldMap.getCurrentNode()
+      if (currentNode && levelNameLabel) {
+        levelNameLabel.setText(currentNode.name)
       }
-      if (input.justPressed('left') && currentSelection > 0) {
-        currentSelection--
-      }
 
-      // Move player marker to selected level
-      const targetPos = levelPositions[currentSelection]
-      playerMarker.position.x += (targetPos.x - playerMarker.position.x) * 0.2
-      playerMarker.position.y += (targetPos.y + 0.5 - playerMarker.position.y) * 0.2
-
-      // Bounce player marker
-      playerMarker.position.y += Math.sin(moveTimer * 5) * 0.05
-
-      // Highlight selected level
-      levelNodes.forEach((node, i) => {
-        if (i === currentSelection) {
-          node.scale.setScalar(1 + Math.sin(moveTimer * 4) * 0.1)
-        } else {
-          node.scale.setScalar(1)
-        }
-      })
-
-      // Enter level
       if (input.justPressed('a') || input.justPressed('start')) {
-        const levelName = `level${currentSelection + 1}` as SceneType
-        sceneManager.switchTo(levelName)
+        const currentNode = worldMap.getCurrentNode()
+        if (currentNode && currentNode.status === 'unlocked') {
+          if (currentNode.onSelect) {
+            currentNode.onSelect()
+          }
+        }
       }
 
-      // Back to title
       if (input.justPressed('b')) {
         sceneManager.switchTo('title')
       }
@@ -189,6 +204,6 @@ export function createMapScene(
 
     render() {
       renderer.render(threeScene, camera)
-    },
+    }
   }
 }
