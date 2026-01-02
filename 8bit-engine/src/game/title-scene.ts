@@ -8,6 +8,7 @@ import type { Scene, SceneType } from './scenes'
 import { SceneManager } from './scenes'
 import { NES_PALETTE } from '../engine/palette'
 import { Input } from '../engine/input'
+import { createBitmapText, BitmapTextStyles } from '../engine/bitmap-font'
 
 export function createTitleScene(
   threeScene: THREE.Scene,
@@ -16,9 +17,10 @@ export function createTitleScene(
   input: Input,
   sceneManager: SceneManager
 ): Scene {
-  let titleMesh: THREE.Mesh
-  let subtitleMesh: THREE.Mesh
-  let pressStartMesh: THREE.Mesh
+  let titleText: THREE.Group
+  let pressStartText: THREE.Group
+  let pressStartBorder: THREE.Mesh
+  let pressStartBackground: THREE.Mesh
   let blinkTimer = 0
   let stars: THREE.Mesh[] = []
 
@@ -52,26 +54,45 @@ export function createTitleScene(
         stars.push(star)
       }
 
-      // Title "8BIT QUEST"
-      const titleGeo = new THREE.BoxGeometry(6, 1.5, 0.5)
-      const titleMat = new THREE.MeshBasicMaterial({ color: NES_PALETTE.YELLOW })
-      titleMesh = new THREE.Mesh(titleGeo, titleMat)
-      titleMesh.position.set(0, 2, 0)
-      threeScene.add(titleMesh)
+      // Title "8BIT QUEST" - using bitmap text
+      titleText = createBitmapText('8BIT QUEST', BitmapTextStyles.title(NES_PALETTE.YELLOW))
+      titleText.position.set(0, 2, 0)
+      threeScene.add(titleText)
 
-      // Subtitle decoration
-      const subGeo = new THREE.BoxGeometry(4, 0.3, 0.3)
-      const subMat = new THREE.MeshBasicMaterial({ color: NES_PALETTE.ORANGE })
-      subtitleMesh = new THREE.Mesh(subGeo, subMat)
-      subtitleMesh.position.set(0, 0.5, 0)
-      threeScene.add(subtitleMesh)
+      // "Press Start" text - using bitmap text
+      pressStartText = createBitmapText('PRESS START', BitmapTextStyles.subtitle(NES_PALETTE.WHITE))
+      pressStartText.position.set(0, -2, 0)
+      threeScene.add(pressStartText)
 
-      // "Press Start" indicator
-      const startGeo = new THREE.BoxGeometry(3, 0.5, 0.3)
-      const startMat = new THREE.MeshBasicMaterial({ color: NES_PALETTE.WHITE })
-      pressStartMesh = new THREE.Mesh(startGeo, startMat)
-      pressStartMesh.position.set(0, -2, 0)
-      threeScene.add(pressStartMesh)
+      // Calculate text width: "PRESS START" = 11 chars
+      // scale = 0.1, char width = 8 pixels, letterSpacing = 0.02
+      const charCount = 11
+      const charWidth = 8 * 0.1  // 8 pixels * scale
+      const spacing = 0.02
+      const textWidth = (charCount * charWidth) + ((charCount - 1) * spacing)
+      const textHeight = 8 * 0.1  // Full 8 pixels tall * scale (to contain descenders like 'p')
+
+      // Text is positioned from top-left, so we need to shift the box down by half its height
+      const boxYOffset = -textHeight / 2
+
+      // "Press Start" background box (slightly larger than text)
+      const padding = 0.2
+      const bgGeo = new THREE.PlaneGeometry(textWidth + padding * 2, textHeight + padding * 2)
+      const bgMat = new THREE.MeshBasicMaterial({ color: NES_PALETTE.DARK_BLUE })
+      pressStartBackground = new THREE.Mesh(bgGeo, bgMat)
+      pressStartBackground.position.set(0, -2 + boxYOffset, -0.1)
+      threeScene.add(pressStartBackground)
+
+      // "Press Start" border (slightly larger than background)
+      const borderThickness = 0.08
+      const borderGeo = new THREE.PlaneGeometry(
+        textWidth + padding * 2 + borderThickness * 2,
+        textHeight + padding * 2 + borderThickness * 2
+      )
+      const borderMat = new THREE.MeshBasicMaterial({ color: NES_PALETTE.CYAN })
+      pressStartBorder = new THREE.Mesh(borderGeo, borderMat)
+      pressStartBorder.position.set(0, -2 + boxYOffset, -0.2)
+      threeScene.add(pressStartBorder)
 
       // Decorative blocks (like a logo)
       const colors = [NES_PALETTE.RED, NES_PALETTE.GREEN, NES_PALETTE.BLUE, NES_PALETTE.CYAN]
@@ -79,7 +100,7 @@ export function createTitleScene(
         const blockGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8)
         const blockMat = new THREE.MeshBasicMaterial({ color: colors[i] })
         const block = new THREE.Mesh(blockGeo, blockMat)
-        block.position.set(-1.5 + i * 1, -0.8, 0)
+        block.position.set(-1.5 + i * 1, 0, 0)
         block.rotation.z = Math.PI / 4
         threeScene.add(block)
       }
@@ -92,15 +113,22 @@ export function createTitleScene(
     },
 
     update(dt: number) {
-      // Blink "Press Start"
+      // Blink "Press Start" with border and background
       blinkTimer += dt
-      if (pressStartMesh) {
-        pressStartMesh.visible = Math.floor(blinkTimer * 2) % 2 === 0
+      const isVisible = Math.floor(blinkTimer * 2) % 2 === 0
+      if (pressStartText) {
+        pressStartText.visible = isVisible
+      }
+      if (pressStartBorder) {
+        pressStartBorder.visible = isVisible
+      }
+      if (pressStartBackground) {
+        pressStartBackground.visible = isVisible
       }
 
       // Animate title
-      if (titleMesh) {
-        titleMesh.rotation.y = Math.sin(blinkTimer * 0.5) * 0.1
+      if (titleText) {
+        titleText.rotation.y = Math.sin(blinkTimer * 0.5) * 0.1
       }
 
       // Twinkle stars
