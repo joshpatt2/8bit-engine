@@ -13,7 +13,8 @@ import { Input } from '../engine/input'
 import { GameLoop } from '../engine/game-loop'
 import { SceneManager } from './scenes'
 import { createTitleScene } from './title-scene'
-import { createMapScene, LevelStatus } from './map-scene'
+import type { LevelStatus } from './map-scene'
+import { createMapScene } from './map-scene'
 import { createLevelScene } from './level-scene'
 
 export function startGame(container: HTMLElement): void {

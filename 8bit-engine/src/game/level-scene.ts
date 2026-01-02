@@ -4,7 +4,8 @@
  */
 
 import * as THREE from 'three'
-import { Scene, SceneType, SceneManager } from './scenes'
+import type { Scene, SceneType } from './scenes'
+import { SceneManager } from './scenes'
 import { NES_PALETTE } from '../engine/palette'
 import { Input } from '../engine/input'
 

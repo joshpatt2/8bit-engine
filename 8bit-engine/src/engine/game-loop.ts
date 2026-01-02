@@ -19,8 +19,12 @@ export class GameLoop {
   private fps: number = 0
   private frameCount: number = 0
   private fpsTime: number = 0
+  private callbacks: GameLoopCallbacks
 
-  constructor(private callbacks: GameLoopCallbacks) {}
+  constructor(callbacks: GameLoopCallbacks) {
+    this.callbacks = callbacks
+    this.loop = this.loop.bind(this)
+  }
 
   start(): void {
     if (this.running) return
@@ -36,7 +40,7 @@ export class GameLoop {
     }
   }
 
-  private loop = (): void => {
+  private loop(): void {
     if (!this.running) return
 
     const currentTime = performance.now()
