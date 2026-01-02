@@ -409,7 +409,7 @@ export class WorldMap {
       const currentNode = this.nodes.get(this.currentNodeId)
       if (currentNode) {
         this.playerMarker.position.x = currentNode.position.x
-        this.playerMarker.position.y = currentNode.position.y + 0.7 + Math.sin(this.moveTimer * 5) * 0.05
+        this.playerMarker.position.y = currentNode.position.y + 0.7 + Math.sin(this.moveTimer * 5) * 0.02
       }
     }
     
