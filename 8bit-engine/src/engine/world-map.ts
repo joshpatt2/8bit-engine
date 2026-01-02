@@ -240,6 +240,46 @@ export class WorldMap {
    * Create player marker
    */
   private createPlayerMarker(): void {
+    // Load corgi texture for player sprite
+    const textureLoader = new THREE.TextureLoader()
+    
+    textureLoader.load(
+      '/src/game/sprites/player/corgi.png',
+      (texture) => {
+        // Configure texture for pixel-perfect rendering
+        texture.magFilter = THREE.NearestFilter
+        texture.minFilter = THREE.NearestFilter
+        
+        // Create sprite with corgi texture
+        const geometry = new THREE.PlaneGeometry(1.5, 1.5)
+        const material = new THREE.MeshBasicMaterial({ 
+          map: texture,
+          transparent: true,
+          side: THREE.DoubleSide
+        })
+        
+        this.playerMarker = new THREE.Mesh(geometry, material)
+        this.playerMarker.position.set(
+          this.playerPosition.x,
+          this.playerPosition.y + 0.7,
+          0.5
+        )
+        
+        this.scene.add(this.playerMarker)
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading corgi texture:', error)
+        // Fallback to colored box if texture fails to load
+        this.createFallbackPlayerMarker()
+      }
+    )
+  }
+
+  /**
+   * Create fallback player marker (colored box)
+   */
+  private createFallbackPlayerMarker(): void {
     const color = this.config.playerColor || NES_PALETTE.RED
     const geometry = new THREE.BoxGeometry(0.6, 0.8, 0.6)
     const material = new THREE.MeshBasicMaterial({ color })
