@@ -8,6 +8,7 @@ import type { Scene, SceneType } from './scenes'
 import { SceneManager } from './scenes'
 import { NES_PALETTE } from '../engine/palette'
 import { Input } from '../engine/input'
+import { AnimatedSprite } from '../engine/animated-sprite'
 
 interface LevelConfig {
   name: SceneType
@@ -90,7 +91,8 @@ export function createLevelScene(
 ): Scene {
   const config = LEVEL_CONFIGS[levelKey]
 
-  let player: THREE.Mesh
+  let playerSprite: AnimatedSprite
+  let playerHitbox: THREE.Mesh  // Keep a hitbox for collision detection
   let platforms: THREE.Mesh[] = []
   let enemies: THREE.Mesh[] = []
   let goal: THREE.Mesh
@@ -191,12 +193,27 @@ export function createLevelScene(
       flag.position.set(config.goalX + 0.4, -2.2, 0)
       threeScene.add(flag)
 
-      // Player
-      const playerGeo = new THREE.BoxGeometry(0.8, 1, 0.8)
-      const playerMat = new THREE.MeshBasicMaterial({ color: NES_PALETTE.BLUE })
-      player = new THREE.Mesh(playerGeo, playerMat)
-      player.position.set(-7, -3, 0)
-      threeScene.add(player)
+      // Player (animated sprite)
+      playerSprite = new AnimatedSprite(threeScene, {
+        sprite: '/src/game/sprites/player/corgi_4x4_left_ear_anim.png',
+        color: NES_PALETTE.BLUE,
+        size: { width: 1, height: 1, depth: 0.5 },
+        spriteLayout: { cols: 2, rows: 2 },
+        animSpeed: 0.15,
+        autoAnimate: true
+      })
+      playerSprite.setPosition(-7, -3, 0.5)
+      
+      // Invisible hitbox for collision detection
+      const hitboxGeo = new THREE.BoxGeometry(0.8, 1, 0.8)
+      const hitboxMat = new THREE.MeshBasicMaterial({ 
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0 // Invisible
+      })
+      playerHitbox = new THREE.Mesh(hitboxGeo, hitboxMat)
+      playerHitbox.position.set(-7, -3, 0)
+      threeScene.add(playerHitbox)
 
       velocityX = 0
       velocityY = 0
@@ -204,6 +221,7 @@ export function createLevelScene(
     },
 
     exit() {
+      playerSprite?.destroy()
       platforms = []
       enemies = []
     },
@@ -217,10 +235,12 @@ export function createLevelScene(
             sceneManager.switchTo('map')
           } else {
             // Respawn
-            player.position.set(-7, -3, 0)
+            playerHitbox.position.set(-7, -3, 0)
+            playerSprite.setPosition(-7, -3, 0.5)
             velocityX = 0
             velocityY = 0
             playerDead = false
+            playerSprite.setVisible(true)
             gameTime = 0
           }
         }
@@ -228,12 +248,17 @@ export function createLevelScene(
       }
 
       gameTime += dt
+      
+      // Update sprite animation
+      playerSprite.update(dt)
 
       // Input
       if (input.isPressed('left')) {
         velocityX = -MOVE_SPEED
+        playerSprite.setFlipX(true)
       } else if (input.isPressed('right')) {
         velocityX = MOVE_SPEED
+        playerSprite.setFlipX(false)
       } else {
         velocityX *= FRICTION
       }
@@ -247,13 +272,13 @@ export function createLevelScene(
       // Gravity
       velocityY -= GRAVITY * dt
 
-      // Move player
-      player.position.x += velocityX * dt
-      player.position.y += velocityY * dt
+      // Move player hitbox
+      playerHitbox.position.x += velocityX * dt
+      playerHitbox.position.y += velocityY * dt
 
       // Ground collision
-      if (player.position.y <= -3.5) {
-        player.position.y = -3.5
+      if (playerHitbox.position.y <= -3.5) {
+        playerHitbox.position.y = -3.5
         velocityY = 0
         isGrounded = true
       }
@@ -265,20 +290,23 @@ export function createLevelScene(
 
         // Simple top collision
         if (
-          player.position.x > plat.position.x - pw / 2 - 0.4 &&
-          player.position.x < plat.position.x + pw / 2 + 0.4 &&
-          player.position.y > plat.position.y &&
-          player.position.y < plat.position.y + ph + 0.5 &&
+          playerHitbox.position.x > plat.position.x - pw / 2 - 0.4 &&
+          playerHitbox.position.x < plat.position.x + pw / 2 + 0.4 &&
+          playerHitbox.position.y > plat.position.y &&
+          playerHitbox.position.y < plat.position.y + ph + 0.5 &&
           velocityY < 0
         ) {
-          player.position.y = plat.position.y + ph / 2 + 0.5
+          playerHitbox.position.y = plat.position.y + ph / 2 + 0.5
           velocityY = 0
           isGrounded = true
         }
       })
 
       // Bounds
-      player.position.x = Math.max(-8, Math.min(8, player.position.x))
+      playerHitbox.position.x = Math.max(-8, Math.min(8, playerHitbox.position.x))
+      
+      // Sync sprite position with hitbox
+      playerSprite.setPosition(playerHitbox.position.x, playerHitbox.position.y, 0.5)
 
       // Enemy movement and collision
       enemies.forEach(enemy => {
@@ -290,11 +318,11 @@ export function createLevelScene(
 
         // Collision with player
         if (checkCollision(
-          player.position.x - 0.4, player.position.y - 0.5, 0.8, 1,
+          playerHitbox.position.x - 0.4, playerHitbox.position.y - 0.5, 0.8, 1,
           enemy.position.x - 0.3, enemy.position.y - 0.3, 0.6, 0.6
         )) {
           // Check if stomping
-          if (velocityY < 0 && player.position.y > enemy.position.y) {
+          if (velocityY < 0 && playerHitbox.position.y > enemy.position.y) {
             // Stomp enemy
             threeScene.remove(enemy)
             enemies = enemies.filter(e => e !== enemy)
@@ -302,14 +330,14 @@ export function createLevelScene(
           } else {
             // Player dies
             playerDead = true
-            player.visible = false
+            playerSprite.setVisible(false)
             gameTime = 0
           }
         }
       })
 
       // Goal collision
-      if (player.position.x > config.goalX - 0.5) {
+      if (playerHitbox.position.x > config.goalX - 0.5) {
         levelComplete = true
         gameTime = 0
       }

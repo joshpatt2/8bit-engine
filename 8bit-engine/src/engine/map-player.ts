@@ -12,6 +12,7 @@
 
 import * as THREE from 'three'
 import { NES_PALETTE } from './palette'
+import { AnimatedSprite } from './animated-sprite'
 
 // =============================================================================
 // MAP PLAYER CONFIGURATION
@@ -56,22 +57,16 @@ export class MapPlayer {
   private visitedNodes: Set<string> = new Set()
   private config: Required<Omit<MapPlayerConfig, 'sprite' | 'onNodeReached' | 'onMovementBlocked'>> & Pick<MapPlayerConfig, 'sprite' | 'onNodeReached' | 'onMovementBlocked'>
   
-  // Visual representation
-  private visual?: THREE.Mesh
-  private scene: THREE.Scene
+  // Visual representation using AnimatedSprite
+  private sprite: AnimatedSprite
   
   // Animation state
-  private spriteFrameIndex: number = 0
-  private spriteAnimTimer: number = 0
   private bounceTimer: number = 0
-  
+
   constructor(scene: THREE.Scene, config: MapPlayerConfig) {
-    this.scene = scene
     this.currentNodeId = config.startNodeId
     this.currentPosition = { x: 0, y: 0 }
-    this.visitedNodes.add(config.startNodeId)
-    
-    // Set defaults
+    this.visitedNodes.add(config.startNodeId)    // Set defaults
     this.config = {
       startNodeId: config.startNodeId,
       sprite: config.sprite,
@@ -84,148 +79,40 @@ export class MapPlayer {
       onMovementBlocked: config.onMovementBlocked
     }
     
-    this.createVisual()
-  }
-
-  /**
-   * Create the visual representation of the player
-   */
-  private createVisual(): void {
-    const sprite = this.config.sprite
-    
-    if (typeof sprite === 'string') {
-      // Load from path
-      this.loadSpriteFromPath(sprite)
-    } else if (sprite instanceof THREE.Texture) {
-      // Use provided texture
-      this.createSpriteVisual(sprite)
-    } else {
-      // Fallback to colored box
-      this.createFallbackVisual()
-    }
-  }
-
-  /**
-   * Load sprite from file path
-   */
-  private loadSpriteFromPath(path: string): void {
-    const textureLoader = new THREE.TextureLoader()
-    
-    textureLoader.load(
-      path,
-      (texture) => {
-        this.createSpriteVisual(texture)
-      },
-      undefined,
-      (error) => {
-        console.error('Error loading player sprite:', error)
-        this.createFallbackVisual()
-      }
-    )
-  }
-
-  /**
-   * Create sprite-based visual
-   */
-  private createSpriteVisual(texture: THREE.Texture): void {
-    // Configure texture for pixel-perfect rendering
-    texture.magFilter = THREE.NearestFilter
-    texture.minFilter = THREE.NearestFilter
-    texture.wrapS = THREE.RepeatWrapping
-    texture.wrapT = THREE.RepeatWrapping
-    
-    // Set up for sprite sheet
-    const { cols, rows } = this.config.spriteLayout
-    const frameWidth = 1 / cols
-    const frameHeight = 1 / rows
-    
-    texture.repeat.set(frameWidth, frameHeight)
-    texture.offset.set(0, 1 - frameHeight) // Start with top-left frame
-    
-    // Create sprite
-    const geometry = new THREE.PlaneGeometry(this.config.size.width, this.config.size.height)
-    const material = new THREE.MeshBasicMaterial({ 
-      map: texture,
-      transparent: true,
-      side: THREE.DoubleSide
+    // Create animated sprite
+    this.sprite = new AnimatedSprite(scene, {
+      sprite: this.config.sprite,
+      color: this.config.color,
+      size: this.config.size,
+      spriteLayout: this.config.spriteLayout,
+      animSpeed: this.config.animSpeed,
+      autoAnimate: true
     })
-    
-    this.visual = new THREE.Mesh(geometry, material)
-    this.visual.position.set(
-      this.currentPosition.x + this.config.markerOffset.x,
-      this.currentPosition.y + this.config.markerOffset.y,
-      this.config.markerOffset.z
-    )
-    
-    this.scene.add(this.visual)
-  }
-
-  /**
-   * Create fallback colored box visual
-   */
-  private createFallbackVisual(): void {
-    const geometry = new THREE.BoxGeometry(0.6, 0.8, 0.6)
-    const material = new THREE.MeshBasicMaterial({ color: this.config.color })
-    
-    this.visual = new THREE.Mesh(geometry, material)
-    this.visual.position.set(
-      this.currentPosition.x + this.config.markerOffset.x,
-      this.currentPosition.y + this.config.markerOffset.y,
-      this.config.markerOffset.z
-    )
-    
-    this.scene.add(this.visual)
-  }
-
-  /**
-   * Update sprite animation
-   */
-  private updateAnimation(deltaTime: number): void {
-    this.spriteAnimTimer += deltaTime
-    
-    if (this.spriteAnimTimer >= this.config.animSpeed) {
-      this.spriteAnimTimer = 0
-      
-      const { cols, rows } = this.config.spriteLayout
-      const totalFrames = cols * rows
-      this.spriteFrameIndex = (this.spriteFrameIndex + 1) % totalFrames
-      
-      // Update texture offset
-      if (this.visual && this.visual.material instanceof THREE.MeshBasicMaterial) {
-        const texture = this.visual.material.map
-        if (texture) {
-          const frameWidth = 1 / cols
-          const frameHeight = 1 / rows
-          
-          const col = this.spriteFrameIndex % cols
-          const row = Math.floor(this.spriteFrameIndex / cols)
-          
-          // Set texture offset (origin is bottom-left in Three.js)
-          texture.offset.x = col * frameWidth
-          texture.offset.y = 1 - (row + 1) * frameHeight
-        }
-      }
-    }
-  }
-
-  /**
-   * Update bounce animation
-   */
-  private updateBounce(deltaTime: number): void {
-    this.bounceTimer += deltaTime
-    
-    if (this.visual) {
-      const bounceOffset = Math.sin(this.bounceTimer * 5) * 0.02
-      this.visual.position.y = this.currentPosition.y + this.config.markerOffset.y + bounceOffset
-    }
   }
 
   /**
    * Update player state and animations
    */
   public update(deltaTime: number): void {
-    this.updateAnimation(deltaTime)
+    // Update sprite animation
+    this.sprite.update(deltaTime)
+    
+    // Update bounce animation
     this.updateBounce(deltaTime)
+  }
+  
+  /**
+   * Update bounce animation
+   */
+  private updateBounce(deltaTime: number): void {
+    this.bounceTimer += deltaTime
+    
+    const bounceOffset = Math.sin(this.bounceTimer * 5) * 0.02
+    this.sprite.setPosition(
+      this.currentPosition.x + this.config.markerOffset.x,
+      this.currentPosition.y + this.config.markerOffset.y + bounceOffset,
+      this.config.markerOffset.z
+    )
   }
 
   /**
@@ -264,11 +151,12 @@ export class MapPlayer {
     this.currentPosition = { ...position }
     this.visitedNodes.add(nodeId)
     
-    // Update visual position
-    if (this.visual) {
-      this.visual.position.x = this.currentPosition.x + this.config.markerOffset.x
-      this.visual.position.y = this.currentPosition.y + this.config.markerOffset.y
-    }
+    // Update sprite position
+    this.sprite.setPosition(
+      this.currentPosition.x + this.config.markerOffset.x,
+      this.currentPosition.y + this.config.markerOffset.y,
+      this.config.markerOffset.z
+    )
     
     // Trigger callback
     if (this.config.onNodeReached) {
@@ -298,35 +186,24 @@ export class MapPlayer {
   public setPosition(x: number, y: number): void {
     this.currentPosition = { x, y }
     
-    if (this.visual) {
-      this.visual.position.x = x + this.config.markerOffset.x
-      this.visual.position.y = y + this.config.markerOffset.y
-    }
+    this.sprite.setPosition(
+      x + this.config.markerOffset.x,
+      y + this.config.markerOffset.y,
+      this.config.markerOffset.z
+    )
   }
 
   /**
    * Get the visual mesh (for external manipulation)
    */
   public getVisual(): THREE.Mesh | undefined {
-    return this.visual
+    return this.sprite.getMesh()
   }
 
   /**
    * Clean up resources
    */
   public destroy(): void {
-    if (this.visual) {
-      if (this.visual.geometry) {
-        this.visual.geometry.dispose()
-      }
-      if (this.visual.material instanceof THREE.MeshBasicMaterial) {
-        if (this.visual.material.map) {
-          this.visual.material.map.dispose()
-        }
-        this.visual.material.dispose()
-      }
-      this.scene.remove(this.visual)
-      this.visual = undefined
-    }
+    this.sprite.destroy()
   }
 }
