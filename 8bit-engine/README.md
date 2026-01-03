@@ -25,14 +25,15 @@ A TypeScript game engine built on Three.js with authentic NES-style constraints 
 
 ### 🗺️ Game Systems
 
+- **Game Class**: Centralized game initialization and lifecycle management
 - **WorldMap**: SMB3-style overworld navigation with graph-based node system
 - **Screen System**: State machine for managing game screens (title, map, gameplay, pause)
-- **Scene Manager**: Legacy scene system with lifecycle hooks
+- **Scene Manager**: Lightweight scene system with lifecycle hooks
 
 ### ✅ Quality Assurance
 
-- **49 Unit Tests**: Comprehensive test coverage with Vitest
-- **100% Passing**: All core modules tested (Input, WorldMap, Bitmap Font)
+- **71 Unit Tests**: Comprehensive test coverage with Vitest
+- **100% Passing**: All core modules tested (Input, WorldMap, Bitmap Font, Game)
 - **CI/CD Ready**: Test scripts for continuous integration
 
 ## Installation
@@ -51,7 +52,49 @@ npm run dev
 
 Open http://localhost:5173 to see the 8BIT QUEST demo game.
 
-### 2. Create Your First Screen
+### 2. Create Your First Game
+
+The easiest way to get started is using the `Game` class, which handles all the boilerplate:
+
+```typescript
+import { Game } from './engine'
+
+// Create game instance
+const game = new Game({
+  container: document.querySelector('#app')!,
+  title: 'MY GAME',
+  controls: 'Arrows: Move | Z: Jump | Enter: Start',
+})
+
+// Create a simple scene
+const titleScene = {
+  name: 'title',
+  enter() {
+    console.log('Title scene entered')
+  },
+  exit() {
+    console.log('Title scene exited')
+  },
+  update(dt: number) {
+    // Game logic here
+    if (game.input.justPressed('start')) {
+      console.log('Start pressed!')
+    }
+  },
+  render() {
+    game.renderer.render(game.scene, game.camera)
+  },
+}
+
+// Register and start
+game.registerScene(titleScene)
+game.switchToScene('title')
+game.start()
+```
+
+### 3. Alternative: Using the Screen System
+
+For more complex games, use the Screen system:
 
 ```typescript
 import { BaseScreen, NES_PALETTE, createBitmapText } from './engine'
@@ -84,33 +127,63 @@ export class MyGameScreen extends BaseScreen {
 }
 ```
 
-### 3. Set Up the Game Loop
+## Core Modules
+
+### Game Class
+
+The `Game` class encapsulates all common game setup logic, eliminating boilerplate.
 
 ```typescript
-import { GameLoop, Input, ScreenManager } from './engine'
-import { MyGameScreen } from './my-game-screen'
+import { Game } from './engine'
 
-const input = new Input()
-const screenManager = new ScreenManager()
-
-screenManager.switchTo(
-  new MyGameScreen('game', scene, camera, renderer, input)
-)
-
-const gameLoop = new GameLoop({
-  update: (dt) => {
-    screenManager.update(dt)
-    input.update()
+const game = new Game({
+  container: document.querySelector('#app')!,
+  
+  // Optional configuration
+  scale: 3,                    // Screen scale (default: 3)
+  title: 'MY GAME',            // HUD title
+  controls: 'Z: Jump',         // HUD controls text
+  showDebug: true,             // Show debug info (default: true)
+  
+  // Custom callbacks
+  onUpdate: (dt, game) => {
+    // Additional update logic
   },
-  render: () => {
-    screenManager.render()
-  }
+  onRender: (game) => {
+    // Additional render logic
+  },
 })
 
-gameLoop.start()
+// Access engine systems
+game.scene          // THREE.Scene
+game.camera         // THREE.OrthographicCamera
+game.renderer       // THREE.WebGLRenderer
+game.input          // Input system
+game.sceneManager   // SceneManager
+game.gameLoop       // GameLoop
+
+// Scene management
+game.registerScene(scene)
+game.switchToScene('title')
+
+// Lifecycle
+game.start()        // Start game loop
+game.stop()         // Stop game loop
+game.destroy()      // Clean up all resources
+
+// Utilities
+game.getFPS()
+game.getCurrentScene()
+game.updateHUD('<strong>New HUD</strong>')
+game.updateDebugInfo({ Score: 1000 })
 ```
 
-## Core Modules
+**Benefits over manual setup:**
+- **Less code**: ~60 lines reduced to ~10 lines
+- **Consistency**: Same setup across all games
+- **Automatic cleanup**: Proper resource disposal
+- **Built-in HUD/Debug**: Optional UI elements
+- **Responsive scaling**: Automatic window resize handling
 
 ### Input System
 
