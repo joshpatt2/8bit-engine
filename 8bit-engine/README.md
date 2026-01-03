@@ -54,7 +54,7 @@ Open http://localhost:5173 to see the 8BIT QUEST demo game.
 ### 2. Create Your First Screen
 
 ```typescript
-import { BaseScreen, NES_PALETTE, createBitmapText } from './engine'
+import { Engine, BaseScreen, NES_PALETTE, createBitmapText } from './engine'
 
 export class MyGameScreen extends BaseScreen {
   onEnter(): void {
@@ -67,15 +67,11 @@ export class MyGameScreen extends BaseScreen {
       align: 'center'
     })
     title.position.set(0, 2, 0)
-    this.scene.add(title)
+    this.addToScene(title)
   }
 
   onUpdate(deltaTime: number): void {
     // Update game logic
-  }
-
-  onRender(): void {
-    this.renderer.render(this.scene, this.camera)
   }
 
   onExit(): void {
@@ -84,30 +80,35 @@ export class MyGameScreen extends BaseScreen {
 }
 ```
 
-### 3. Set Up the Game Loop
+### 3. Set Up the Game
 
 ```typescript
-import { GameLoop, Input, ScreenManager } from './engine'
+import { Engine } from './engine'
 import { MyGameScreen } from './my-game-screen'
 
-const input = new Input()
-const screenManager = new ScreenManager()
-
-screenManager.switchTo(
-  new MyGameScreen('game', scene, camera, renderer, input)
-)
-
-const gameLoop = new GameLoop({
-  update: (dt) => {
-    screenManager.update(dt)
-    input.update()
-  },
-  render: () => {
-    screenManager.render()
-  }
+// Create engine - handles rendering, input, and game loop
+const engine = new Engine({
+  container: document.querySelector('#app')!,
+  width: 800,
+  height: 600,
+  left: -8,
+  right: 8,
+  top: 6,
+  bottom: -6
 })
 
-gameLoop.start()
+// Create and register screen
+const myScreen = new MyGameScreen(
+  'game',
+  engine.getRenderer(),
+  engine.getInput()
+)
+
+engine.getScreenManager().register(myScreen)
+engine.getScreenManager().switchTo('game')
+
+// Start the game
+engine.start()
 ```
 
 ## Core Modules
@@ -403,39 +404,69 @@ See [SPRITES.md](./SPRITES.md) for detailed documentation.
 Manage game states with lifecycle hooks and stack-based navigation.
 
 ```typescript
-import { BaseScreen, ScreenManager } from './engine'
+import { Engine, BaseScreen } from './engine'
+
+// Create engine
+const engine = new Engine({
+  container: document.querySelector('#app')!,
+  width: 800,
+  height: 600
+})
 
 class TitleScreen extends BaseScreen {
   onEnter(): void {
+    this.setBackground(0x000000)
+    this.addAmbientLight()
     // Initialize title screen
   }
   
   onUpdate(dt: number): void {
     if (this.input.justPressed('start')) {
       // Switch to game screen
-      this.screenManager.switchTo(new GameScreen(...))
+      engine.getScreenManager().switchTo('game')
     }
   }
   
-  onRender(): void {
-    this.renderer.render(this.scene, this.camera)
-  }
-  
   onExit(): void {
-    // Cleanup
+    this.clearScene()
   }
 }
 
-const screenManager = new ScreenManager()
+class GameScreen extends BaseScreen {
+  onEnter(): void {
+    // Initialize game
+  }
+  
+  onUpdate(dt: number): void {
+    // Game logic
+  }
+  
+  onExit(): void {
+    this.clearScene()
+  }
+}
+
+const screenManager = engine.getScreenManager()
+
+// Register screens
+screenManager.register(
+  new TitleScreen('title', engine.getRenderer(), engine.getInput())
+)
+screenManager.register(
+  new GameScreen('game', engine.getRenderer(), engine.getInput())
+)
 
 // Switch screens (replaces current)
-screenManager.switchTo(new TitleScreen(...))
+screenManager.switchTo('title')
 
 // Push screen (stacks on top - for pause menus)
-screenManager.push(new PauseScreen(...))
+screenManager.push('pause')
 
 // Pop screen (returns to previous)
 screenManager.pop()
+
+// Start the engine
+engine.start()
 ```
 
 ### Color Palette
@@ -630,11 +661,16 @@ Constraints breed creativity. By limiting ourselves to NES-era capabilities:
 
 ### State Management
 
-The engine provides two systems:
-- **Screens**: Modern, recommended for new projects
-- **Scenes**: Legacy, used in the demo game
+The engine uses a **Screen** system for managing game states. Screens represent distinct states like:
+- Title screen
+- World map
+- Level gameplay
+- Pause menu
+- Game over
 
-Use Screens for cleaner code and better lifecycle management.
+Each screen has lifecycle hooks (`onEnter`, `onUpdate`, `onExit`) and the `ScreenManager` provides stack-based navigation for modal screens like pause menus.
+
+The `Engine` class provides a simple initialization API that manages rendering, input, screen management, and the game loop - eliminating boilerplate and hiding Three.js implementation details.
 
 ## Roadmap
 
