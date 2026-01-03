@@ -82,10 +82,10 @@ export class Input {
         this.state.right = pressed
         break
       case 'z':
-      case ' ':  // Space also maps to A
         this.state.a = pressed
         break
       case 'x':
+      case ' ':  // Space maps to B for easier access
         this.state.b = pressed
         break
       case 'enter':

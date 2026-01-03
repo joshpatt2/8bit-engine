@@ -196,7 +196,7 @@ const input = new Input()
 
 // Check if button is currently pressed
 if (input.isPressed('a')) {
-  // A button (Z/Space key or gamepad button)
+  // A button (Z key or gamepad button)
 }
 
 // Check if button was just pressed this frame
@@ -223,8 +223,8 @@ input.update()
 
 **Keyboard Mappings:**
 - **Arrows/WASD** → D-Pad (up, down, left, right)
-- **Z/Space** → A button
-- **X** → B button
+- **Z** → A button (jump/accept)
+- **X/Space** → B button (run/cancel)
 - **Enter** → Start
 - **Shift** → Select
 

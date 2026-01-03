@@ -77,10 +77,10 @@ describe('Input', () => {
       expect(input.isPressed('select')).toBe(true)
     })
 
-    it('should map Space to A button', () => {
+    it('should map Space to B button', () => {
       const spaceEvent = new KeyboardEvent('keydown', { key: ' ' })
       window.dispatchEvent(spaceEvent)
-      expect(input.isPressed('a')).toBe(true)
+      expect(input.isPressed('b')).toBe(true)
     })
   })
 
@@ -135,6 +135,23 @@ describe('Input', () => {
       expect(input.isPressed('up')).toBe(true)
       expect(input.isPressed('right')).toBe(true)
       expect(input.isPressed('a')).toBe(true)
+    })
+
+    it('should map both X and Space to B button', () => {
+      // Test X key
+      const xEvent = new KeyboardEvent('keydown', { key: 'x' })
+      window.dispatchEvent(xEvent)
+      expect(input.isPressed('b')).toBe(true)
+
+      // Release X
+      const xUpEvent = new KeyboardEvent('keyup', { key: 'x' })
+      window.dispatchEvent(xUpEvent)
+      expect(input.isPressed('b')).toBe(false)
+
+      // Test Space key
+      const spaceEvent = new KeyboardEvent('keydown', { key: ' ' })
+      window.dispatchEvent(spaceEvent)
+      expect(input.isPressed('b')).toBe(true)
     })
   })
 
