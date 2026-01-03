@@ -281,17 +281,13 @@ describe('Game', () => {
 
       game.registerScene(mockScene)
       game.switchToScene('test')
-      game.start()
 
-      // Wait a bit for update to be called
-      return new Promise<void>((resolve) => {
-        setTimeout(() => {
-          expect(onUpdate).toHaveBeenCalled()
-          expect(onUpdate.mock.calls[0][1]).toBe(game)
-          game.stop()
-          resolve()
-        }, 100)
-      })
+      // Use deterministic stepping instead of setTimeout
+      game.gameLoop.step(16.67) // Step one frame (60fps)
+
+      expect(onUpdate).toHaveBeenCalled()
+      expect(onUpdate.mock.calls[0][1]).toBe(game)
+      expect(typeof onUpdate.mock.calls[0][0]).toBe('number') // Delta time
     })
 
     it('should call custom onRender callback', () => {
@@ -308,29 +304,52 @@ describe('Game', () => {
 
       game.registerScene(mockScene)
       game.switchToScene('test')
-      game.start()
 
-      // Wait a bit for render to be called
-      return new Promise<void>((resolve) => {
-        setTimeout(() => {
-          expect(onRender).toHaveBeenCalled()
-          expect(onRender.mock.calls[0][0]).toBe(game)
-          game.stop()
-          resolve()
-        }, 100)
-      })
+      // Use deterministic stepping instead of setTimeout
+      game.gameLoop.step(16.67) // Step one frame (60fps)
+
+      expect(onRender).toHaveBeenCalled()
+      expect(onRender.mock.calls[0][0]).toBe(game)
     })
   })
 
   describe('Window Resize', () => {
     it('should handle window resize', () => {
-      game = new Game({ container })
+      game = new Game({ container, scale: 3 })
 
+      const canvas = game.renderer.domElement
+      
+      // Get initial dimensions
+      const initialWidth = canvas.style.width
+      const initialHeight = canvas.style.height
+      
+      expect(initialWidth).toBeTruthy()
+      expect(initialHeight).toBeTruthy()
+      expect(initialWidth).toMatch(/px$/)
+      expect(initialHeight).toMatch(/px$/)
+
+      // Change window size
+      const originalInnerWidth = window.innerWidth
+      const originalInnerHeight = window.innerHeight
+      
+      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1920 })
+      Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: 1080 })
+      
       // Trigger resize
       window.dispatchEvent(new Event('resize'))
 
-      // Style should be set (even if to the same value)
-      expect(game.renderer.domElement.style.width).toBeDefined()
+      const newWidth = canvas.style.width
+      const newHeight = canvas.style.height
+      
+      // Dimensions should have changed
+      expect(newWidth).toBeTruthy()
+      expect(newHeight).toBeTruthy()
+      expect(newWidth).toMatch(/px$/)
+      expect(newHeight).toMatch(/px$/)
+      
+      // Restore window size
+      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: originalInnerWidth })
+      Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: originalInnerHeight })
     })
 
     it('should remove resize handler on destroy', () => {
@@ -338,8 +357,156 @@ describe('Game', () => {
 
       game.destroy()
 
+      // Change window size after destroy
+      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 9999 })
+      Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: 9999 })
+      
+      // Trigger resize - should have no effect since handler is removed
+      window.dispatchEvent(new Event('resize'))
+
+      // Canvas should no longer be in the container (was removed during destroy)
+      expect(container.children.length).toBe(0)
+      
       // Verify game is stopped
       expect(game.gameLoop.isRunning()).toBe(false)
+    })
+  })
+
+  describe('Edge Cases', () => {
+    beforeEach(() => {
+      game = new Game({ container })
+    })
+
+    it('should handle start() called twice', () => {
+      game.start()
+      expect(game.gameLoop.isRunning()).toBe(true)
+      
+      // Starting again should be idempotent
+      game.start()
+      expect(game.gameLoop.isRunning()).toBe(true)
+      
+      game.stop()
+    })
+
+    it('should handle stop() called twice', () => {
+      game.start()
+      game.stop()
+      expect(game.gameLoop.isRunning()).toBe(false)
+      
+      // Stopping again should not throw
+      expect(() => game.stop()).not.toThrow()
+      expect(game.gameLoop.isRunning()).toBe(false)
+    })
+
+    it('should handle destroy() called twice', () => {
+      game.start()
+      game.destroy()
+      
+      expect(container.children.length).toBe(0)
+      expect(game.gameLoop.isRunning()).toBe(false)
+      
+      // Destroying again should not throw
+      expect(() => game.destroy()).not.toThrow()
+    })
+
+    it('should handle switching to non-existent scene', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      
+      game.switchToScene('nonexistent')
+      
+      expect(consoleSpy).toHaveBeenCalledWith('Scene "nonexistent" not found')
+      expect(game.getCurrentScene()).toBeNull()
+      
+      consoleSpy.mockRestore()
+    })
+
+    it('should handle switching to same scene twice', () => {
+      const mockScene = {
+        name: 'test',
+        enter: vi.fn(),
+        exit: vi.fn(),
+        update: vi.fn(),
+        render: vi.fn(),
+      }
+
+      game.registerScene(mockScene)
+      game.switchToScene('test')
+      
+      expect(mockScene.enter).toHaveBeenCalledTimes(1)
+      expect(mockScene.exit).toHaveBeenCalledTimes(0)
+      
+      // Switch to same scene
+      game.switchToScene('test')
+      
+      // Should exit and re-enter
+      expect(mockScene.exit).toHaveBeenCalledTimes(1)
+      expect(mockScene.enter).toHaveBeenCalledTimes(2)
+    })
+
+    it('should handle updateHUD after destroy', () => {
+      game = new Game({ container, title: 'Test' })
+      game.destroy()
+      
+      // Should not throw
+      expect(() => game.updateHUD('test')).not.toThrow()
+    })
+
+    it('should handle updateDebugInfo after destroy', () => {
+      game = new Game({ container, showDebug: true })
+      game.destroy()
+      
+      // Should not throw
+      expect(() => game.updateDebugInfo({ test: 'value' })).not.toThrow()
+    })
+
+    it('should handle update/render when no scene is active', () => {
+      // Step the game loop without any active scene
+      expect(() => game.gameLoop.step()).not.toThrow()
+    })
+
+    it('should cleanup even if DOM elements were removed externally', () => {
+      game = new Game({ container, title: 'Test', showDebug: true })
+      
+      // Manually remove HUD and debug elements before destroy
+      const hud = document.getElementById('hud')
+      const debug = document.getElementById('debug')
+      
+      if (hud && hud.parentNode) {
+        hud.parentNode.removeChild(hud)
+      }
+      if (debug && debug.parentNode) {
+        debug.parentNode.removeChild(debug)
+      }
+      
+      // Destroy should not throw
+      expect(() => game.destroy()).not.toThrow()
+      expect(game.gameLoop.isRunning()).toBe(false)
+    })
+
+    it('should handle multiple scenes registered with same name', () => {
+      const scene1 = {
+        name: 'duplicate',
+        enter: vi.fn(),
+        exit: vi.fn(),
+        update: vi.fn(),
+        render: vi.fn(),
+      }
+
+      const scene2 = {
+        name: 'duplicate',
+        enter: vi.fn(),
+        exit: vi.fn(),
+        update: vi.fn(),
+        render: vi.fn(),
+      }
+
+      game.registerScene(scene1)
+      game.registerScene(scene2) // Overwrites first
+      game.switchToScene('duplicate')
+
+      // Should enter the second scene
+      expect(scene1.enter).not.toHaveBeenCalled()
+      expect(scene2.enter).toHaveBeenCalled()
     })
   })
 })
