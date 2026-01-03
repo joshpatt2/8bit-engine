@@ -26,7 +26,6 @@ export class MapScreen extends BaseScreen {
       startNodeId: 'start',
       backgroundColor: NES_PALETTE.DARK_BLUE,
       pathColor: NES_PALETTE.BROWN,
-      playerColor: NES_PALETTE.RED,
       showLockedPaths: true
     }
     
