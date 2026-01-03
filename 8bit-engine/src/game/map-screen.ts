@@ -29,7 +29,9 @@ export class MapScreen extends BaseScreen {
       showLockedPaths: true
     }
     
-    this.worldMap = new WorldMap(this.scene, mapConfig)
+    // WorldMap needs THREE.Scene - use escape hatch
+    const threeScene = this.renderer.getThreeScene()
+    this.worldMap = new WorldMap(threeScene, mapConfig)
     
     // Create UI label to show current node name
     this.levelNameLabel = createLabel({
@@ -38,10 +40,11 @@ export class MapScreen extends BaseScreen {
       scale: 0.16
     })
     this.levelNameLabel.setPosition(0, 110, 10)
-    this.scene.add(this.levelNameLabel.group)
+    this.addToScene(this.levelNameLabel.group)
     
     // Position camera to see the whole map
-    this.camera.position.set(0, 0, 20)
+    const camera = this.renderer.getCamera()
+    camera.position.set(0, 0, 20)
   }
 
   /**

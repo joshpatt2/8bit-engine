@@ -12,9 +12,9 @@
  * This provides a cleaner, more structured alternative to raw scenes
  */
 
-import * as THREE from 'three'
 import { Input } from './input'
 import { ClickHandler } from './click-handler'
+import { SceneRenderer } from './scene-renderer'
 
 // =============================================================================
 // SCREEN INTERFACE
@@ -49,66 +49,63 @@ export interface Screen {
 
 export abstract class BaseScreen implements Screen {
   public readonly name: string
-  protected scene: THREE.Scene
-  protected camera: THREE.Camera
-  protected renderer: THREE.WebGLRenderer
+  protected renderer: SceneRenderer
   protected input: Input
   protected clickHandler?: ClickHandler
 
   constructor(
     name: string,
-    scene: THREE.Scene,
-    camera: THREE.Camera,
-    renderer: THREE.WebGLRenderer,
+    renderer: SceneRenderer,
     input: Input
   ) {
     this.name = name
-    this.scene = scene
-    this.camera = camera
     this.renderer = renderer
     this.input = input
+  }
+
+  /**
+   * Add an object to the scene
+   */
+  protected addToScene(object: any): void {
+    this.renderer.addObject(object)
+  }
+
+  /**
+   * Remove an object from the scene
+   */
+  protected removeFromScene(object: any): void {
+    this.renderer.removeObject(object)
   }
 
   /**
    * Initialize click handling for this screen
    */
   protected enableClickHandling(): void {
-    this.clickHandler = new ClickHandler(this.camera, this.scene, this.renderer.domElement)
+    const camera = this.renderer.getCamera()
+    const scene = this.renderer.getThreeScene()
+    const domElement = this.renderer.getDomElement()
+    this.clickHandler = new ClickHandler(camera, scene, domElement)
   }
 
   /**
    * Clear all objects from the scene
    */
   protected clearScene(): void {
-    while (this.scene.children.length > 0) {
-      const obj = this.scene.children[0]
-      if (obj instanceof THREE.Mesh) {
-        if (obj.geometry) obj.geometry.dispose()
-        if (obj.material) {
-          if (Array.isArray(obj.material)) {
-            obj.material.forEach(mat => mat.dispose())
-          } else {
-            obj.material.dispose()
-          }
-        }
-      }
-      this.scene.remove(obj)
-    }
+    this.renderer.clear()
   }
 
   /**
    * Set scene background color
    */
   protected setBackground(color: number): void {
-    this.scene.background = new THREE.Color(color)
+    this.renderer.setBackgroundColor(color)
   }
 
   /**
    * Add ambient lighting to scene
    */
   protected addAmbientLight(intensity: number = 1): void {
-    const light = new THREE.AmbientLight(0xffffff, intensity)
-    this.scene.add(light)
+    this.renderer.addAmbientLight(intensity)
   }
 
   // Abstract methods that must be implemented
@@ -118,7 +115,7 @@ export abstract class BaseScreen implements Screen {
 
   // Default render implementation
   onRender(): void {
-    this.renderer.render(this.scene, this.camera)
+    this.renderer.render()
   }
 
   // Optional lifecycle methods
