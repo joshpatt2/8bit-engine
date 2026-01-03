@@ -1,12 +1,92 @@
 /**
  * Bitmap Font Renderer
  * NES-style 8x8 tile-based text rendering
- * 
+ *
  * Each character is represented as an 8x8 grid of pixels
  * This is how real NES games rendered text
+ *
+ * Performance: Uses DataTexture per character (1 mesh per char)
+ * instead of individual pixel meshes (up to 64 meshes per char)
  */
 
 import * as THREE from 'three'
+
+// =============================================================================
+// TEXTURE CACHE
+// =============================================================================
+
+/**
+ * Cache for character textures to avoid recreating them
+ * Key format: "char:color" (e.g., "A:16777215")
+ */
+const textureCache = new Map<string, THREE.DataTexture>()
+
+/**
+ * Get or create a cached texture for a character/color combination
+ */
+function getCharacterTexture(charData: number[], color: number): THREE.DataTexture {
+  const cacheKey = `${charData.join(',')}:${color}`
+
+  let texture = textureCache.get(cacheKey)
+  if (texture) {
+    return texture
+  }
+
+  // Create 8x8 RGBA texture
+  const data = new Uint8Array(8 * 8 * 4)
+
+  // Extract RGB from hex color
+  const r = (color >> 16) & 0xff
+  const g = (color >> 8) & 0xff
+  const b = color & 0xff
+
+  // Fill texture data from font bitmap
+  for (let row = 0; row < 8; row++) {
+    const rowData = charData[row]
+
+    for (let col = 0; col < 8; col++) {
+      // Check if this pixel is "on" (bit is set)
+      const bitMask = 1 << (7 - col)
+      const isPixelOn = (rowData & bitMask) !== 0
+
+      // Texture Y is flipped (bottom-up in WebGL)
+      const texY = 7 - row
+      const idx = (texY * 8 + col) * 4
+
+      if (isPixelOn) {
+        data[idx] = r
+        data[idx + 1] = g
+        data[idx + 2] = b
+        data[idx + 3] = 255
+      } else {
+        data[idx] = 0
+        data[idx + 1] = 0
+        data[idx + 2] = 0
+        data[idx + 3] = 0
+      }
+    }
+  }
+
+  texture = new THREE.DataTexture(data, 8, 8, THREE.RGBAFormat, THREE.UnsignedByteType)
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
+  texture.needsUpdate = true
+
+  textureCache.set(cacheKey, texture)
+  return texture
+}
+
+/**
+ * Clear the texture cache (call on cleanup if needed)
+ */
+export function clearBitmapFontCache(): void {
+  textureCache.forEach(texture => texture.dispose())
+  textureCache.clear()
+}
+
+// =============================================================================
+// FONT DATA
+// =============================================================================
 
 // Simple 5x7 pixel font data (stored as binary patterns)
 // Each character is 8 rows of 8 bits (though we only use 5x7)
@@ -95,11 +175,14 @@ export function createBitmapText(
   for (let i = 0; i < upperText.length; i++) {
     const char = upperText[i]
     const charData = FONT_DATA[char] || FONT_DATA[' ']
-    
+
     const charMesh = createCharacterMesh(charData, color, scale)
-    charMesh.position.x = xOffset
+    // Position mesh center to align with old pixel-based positioning
+    // Old pixels were at 0-7, so left edge was at -0.5*scale, center at 3.5*scale
+    charMesh.position.x = xOffset + 3.5 * scale
+    charMesh.position.y = -3.5 * scale
     group.add(charMesh)
-    
+
     xOffset += 8 * scale + letterSpacing
   }
 
@@ -108,53 +191,53 @@ export function createBitmapText(
 
 /**
  * Create a mesh for a single character from its bitmap data
+ * Uses a single PlaneGeometry with a cached DataTexture (1 mesh per character)
  */
 function createCharacterMesh(
   charData: number[],
   color: number,
   scale: number
-): THREE.Group {
-  const charGroup = new THREE.Group()
-  const pixelSize = scale
+): THREE.Mesh {
+  const charSize = 8 * scale
 
-  // Each row is a byte representing 8 pixels
-  for (let row = 0; row < 8; row++) {
-    const rowData = charData[row]
-    
-    for (let col = 0; col < 8; col++) {
-      // Check if this pixel is "on" (bit is set)
-      const bitMask = 1 << (7 - col)
-      const isPixelOn = (rowData & bitMask) !== 0
-      
-      if (isPixelOn) {
-        const pixelGeo = new THREE.PlaneGeometry(pixelSize, pixelSize)
-        const pixelMat = new THREE.MeshBasicMaterial({ color })
-        const pixel = new THREE.Mesh(pixelGeo, pixelMat)
-        
-        // Position pixel in character grid
-        pixel.position.x = col * pixelSize
-        pixel.position.y = -row * pixelSize
-        
-        charGroup.add(pixel)
-      }
-    }
-  }
+  // Get or create cached texture for this character/color
+  const texture = getCharacterTexture(charData, color)
 
-  return charGroup
+  // Single plane geometry for the entire character
+  const geometry = new THREE.PlaneGeometry(charSize, charSize)
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    alphaTest: 0.5
+  })
+
+  const mesh = new THREE.Mesh(geometry, material)
+
+  // Position is set by createBitmapText, not here
+  return mesh
 }
 
 /**
  * Update the text of an existing bitmap text group
- * More efficient than destroying and recreating
+ * Properly disposes old geometry/materials before replacing
  */
 export function updateBitmapText(
   group: THREE.Group,
   text: string,
   options: BitmapTextOptions = {}
 ): void {
-  // Clear existing children
+  // Dispose and remove existing children
   while (group.children.length > 0) {
-    group.remove(group.children[0])
+    const child = group.children[0]
+    group.remove(child)
+
+    // Dispose geometry and material (textures are cached, don't dispose)
+    if (child instanceof THREE.Mesh) {
+      child.geometry.dispose()
+      if (child.material instanceof THREE.Material) {
+        child.material.dispose()
+      }
+    }
   }
 
   // Add new text

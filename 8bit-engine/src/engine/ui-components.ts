@@ -54,14 +54,6 @@ export function createButton(options: ButtonOptions): Button {
 
   const group = new THREE.Group()
 
-  // Create text
-  const textMesh = createBitmapText(text, {
-    color: textColor,
-    align: 'center',
-    ...textStyle,
-  })
-  group.add(textMesh)
-
   // Calculate dimensions based on text
   const scale = textStyle?.scale || 0.1
   const letterSpacing = textStyle?.letterSpacing || 0
@@ -72,6 +64,19 @@ export function createButton(options: ButtonOptions): Button {
 
   // Position offset for centered box
   const boxYOffset = -textHeight / 2
+
+  // Create text - centered both horizontally and vertically
+  const textMesh = createBitmapText(text, {
+    color: textColor,
+    align: 'center',
+    ...textStyle,
+  })
+  // Position text centered in box
+  // Horizontal: text is offset by -0.5*scale due to character positioning math
+  // Vertical: font glyphs use rows 0-6 (row 7 empty), so visual center is at -3*scale
+  textMesh.position.x = padding
+  textMesh.position.y = boxYOffset + 3 * scale
+  group.add(textMesh)
 
   // Background
   const bgGeo = new THREE.PlaneGeometry(
@@ -218,6 +223,10 @@ export interface TextBoxOptions {
   padding?: number
   borderThickness?: number
   textScale?: number
+  /** Horizontal text alignment within the box */
+  textAlign?: 'left' | 'center' | 'right'
+  /** Vertical text alignment within the box */
+  verticalAlign?: 'top' | 'center' | 'bottom'
 }
 
 export interface TextBox {
@@ -244,45 +253,88 @@ export function createTextBox(options: TextBoxOptions): TextBox {
     padding = 0.3,
     borderThickness = 0.1,
     textScale = 0.08,
+    textAlign = 'center',
+    verticalAlign = 'center',
   } = options
 
   const group = new THREE.Group()
 
-  // Create text
-  let textMesh = createBitmapText(text, {
-    color: textColor,
-    scale: textScale,
-    align: 'left',
-  })
-  textMesh.position.set(0, 0, 0.1)
-  group.add(textMesh)
-
   // Calculate box dimensions
   const charCount = text.length
   const charWidth = 8 * textScale
-  const textWidth = width || ((charCount * charWidth) + ((charCount - 1) * (textScale * 0.2)))
+  const textContentWidth = (charCount * charWidth) + ((charCount - 1) * (textScale * 0.2))
+  const boxWidth = width || textContentWidth
   const textHeight = 8 * textScale
 
-  // Background
+  // Calculate text position based on alignment
+  function getTextPosition(currentText: string): { x: number; y: number } {
+    const currentCharCount = currentText.length
+    const currentTextWidth = (currentCharCount * charWidth) + ((currentCharCount - 1) * (textScale * 0.2))
+
+    // Horizontal position
+    let x: number
+    switch (textAlign) {
+      case 'center':
+        x = boxWidth / 2
+        break
+      case 'right':
+        x = boxWidth - currentTextWidth / 2
+        break
+      case 'left':
+      default:
+        x = currentTextWidth / 2
+        break
+    }
+
+    // Vertical position
+    let y: number
+    switch (verticalAlign) {
+      case 'center':
+        y = -textHeight / 2
+        break
+      case 'bottom':
+        y = -textHeight
+        break
+      case 'top':
+      default:
+        y = 0
+        break
+    }
+
+    return { x, y }
+  }
+
+  // Create text with alignment
+  const bitmapAlign = textAlign // Pass through to bitmap text
+  let textMesh = createBitmapText(text, {
+    color: textColor,
+    scale: textScale,
+    align: bitmapAlign,
+  })
+  const textPos = getTextPosition(text)
+  textMesh.position.set(textPos.x, textPos.y, 0.1)
+  group.add(textMesh)
+
+  // Background - centered on the box
   const bgGeo = new THREE.PlaneGeometry(
-    textWidth + padding * 2,
+    boxWidth + padding * 2,
     textHeight + padding * 2
   )
   const bgMat = new THREE.MeshBasicMaterial({ color: backgroundColor })
   const background = new THREE.Mesh(bgGeo, bgMat)
-  background.position.set(textWidth / 2, -textHeight / 2, 0)
+  background.position.set(boxWidth / 2, -textHeight / 2, 0)
   group.add(background)
 
   // Optional border
   let border: THREE.Mesh | undefined
   if (borderColor !== undefined) {
     const borderGeo = new THREE.PlaneGeometry(
-      textWidth + padding * 2 + borderThickness * 2,
+      boxWidth + padding * 2 + borderThickness * 2,
       textHeight + padding * 2 + borderThickness * 2
     )
     const borderMat = new THREE.MeshBasicMaterial({ color: borderColor })
     border = new THREE.Mesh(borderGeo, borderMat)
-    border.position.set(textWidth / 2, -textHeight / 2, -0.1)
+    border.position.set(boxWidth / 2, -textHeight / 2, -0.1)
     group.add(border)
   }
 
@@ -294,13 +346,14 @@ export function createTextBox(options: TextBoxOptions): TextBox {
     setText: (newText: string) => {
       // Remove old text
       group.remove(textMesh)
-      // Create new text
+      // Create new text with same alignment
       textMesh = createBitmapText(newText, {
         color: textColor,
         scale: textScale,
-        align: 'left',
+        align: bitmapAlign,
       })
-      textMesh.position.set(0, 0, 0.1)
+      const newTextPos = getTextPosition(newText)
+      textMesh.position.set(newTextPos.x, newTextPos.y, 0.1)
       group.add(textMesh)
     },
     setVisible: (visible: boolean) => {

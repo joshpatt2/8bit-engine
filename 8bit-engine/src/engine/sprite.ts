@@ -165,9 +165,14 @@ export class PatternTable {
 export class Sprite {
   public attributes: SpriteAttributes
   private mesh?: THREE.Mesh
+  private geometry?: THREE.PlaneGeometry
+  private material?: THREE.MeshBasicMaterial
+  private texture?: THREE.DataTexture
+  private textureData?: Uint8Array
   private scene: THREE.Scene
   private patternTable: PatternTable
   private palettes: SpritePalette[]
+  private isInScene = false
 
   constructor(
     scene: THREE.Scene,
@@ -180,82 +185,121 @@ export class Sprite {
     this.palettes = palettes
     this.attributes = { visible: true, ...attributes }
     this.createMesh()
+    this.updateTexture()
   }
 
+  /**
+   * Create the mesh once - geometry and material are reused
+   */
   private createMesh(): void {
+    // Create 8x8 RGBA texture data (reused on updates)
+    this.textureData = new Uint8Array(8 * 8 * 4)
+
+    this.texture = new THREE.DataTexture(
+      this.textureData,
+      8, 8,
+      THREE.RGBAFormat,
+      THREE.UnsignedByteType
+    )
+    this.texture.magFilter = THREE.NearestFilter
+    this.texture.minFilter = THREE.NearestFilter
+    this.texture.needsUpdate = true
+
+    // Single plane geometry for the entire sprite (8x8 pixels = 8 units)
+    this.geometry = new THREE.PlaneGeometry(PPU.TILE_SIZE, PPU.TILE_SIZE)
+
+    this.material = new THREE.MeshBasicMaterial({
+      map: this.texture,
+      transparent: true,
+      alphaTest: 0.5
+    })
+
+    this.mesh = new THREE.Mesh(this.geometry, this.material)
+    this.updatePosition()
+
+    if (this.attributes.visible !== false) {
+      this.scene.add(this.mesh)
+      this.isInScene = true
+    }
+  }
+
+  /**
+   * Update texture data in-place - no geometry rebuild needed
+   */
+  private updateTexture(): void {
+    if (!this.textureData || !this.texture) return
+
     const pattern = this.patternTable.getPattern(this.attributes.tileIndex)
     if (!pattern) {
-      console.warn(`Pattern ${this.attributes.tileIndex} not found`)
+      // Clear texture if no pattern
+      this.textureData.fill(0)
+      this.texture.needsUpdate = true
       return
     }
 
     const palette = this.palettes[this.attributes.paletteIndex]
     if (!palette) {
-      console.warn(`Palette ${this.attributes.paletteIndex} not found`)
+      this.textureData.fill(0)
+      this.texture.needsUpdate = true
       return
     }
 
-    // Create geometry for the sprite
-    const group = new THREE.Group()
-    
-    const pixelSize = PPU.TILE_SIZE / 8 // Each sprite is 8×8 pixels
-    
+    // Build color lookup (palette index -> RGBA)
+    const colors: [number, number, number, number][] = [
+      [0, 0, 0, 0], // 0 = transparent
+      this.hexToRGBA(palette.color1),
+      this.hexToRGBA(palette.color2),
+      this.hexToRGBA(palette.color3)
+    ]
+
+    // Fill texture data with pattern colors
     for (let y = 0; y < 8; y++) {
       for (let x = 0; x < 8; x++) {
-        let pixelValue = pattern.pixels[y][x]
-        
-        // Handle flipping
-        let srcX = x
-        let srcY = y
-        if (this.attributes.flipX) srcX = 7 - x
-        if (this.attributes.flipY) srcY = 7 - y
-        pixelValue = pattern.pixels[srcY][srcX]
-        
-        // 0 is transparent
-        if (pixelValue === 0) continue
-        
-        // Get color from palette
-        let color: number
-        switch (pixelValue) {
-          case 1: color = palette.color1; break
-          case 2: color = palette.color2; break
-          case 3: color = palette.color3; break
-          default: continue
-        }
-        
-        const geometry = new THREE.PlaneGeometry(pixelSize, pixelSize)
-        const material = new THREE.MeshBasicMaterial({ color })
-        const pixel = new THREE.Mesh(geometry, material)
-        
-        // Position pixel within the 8×8 sprite
-        pixel.position.x = (x - 3.5) * pixelSize
-        pixel.position.y = (3.5 - y) * pixelSize
-        
-        group.add(pixel)
+        // Handle flipping at texture level
+        let srcX = this.attributes.flipX ? 7 - x : x
+        let srcY = this.attributes.flipY ? 7 - y : y
+
+        const pixelValue = pattern.pixels[srcY][srcX]
+        const color = colors[pixelValue] || colors[0]
+
+        // Texture Y is flipped (bottom-up in WebGL)
+        const texY = 7 - y
+        const idx = (texY * 8 + x) * 4
+
+        this.textureData[idx] = color[0]     // R
+        this.textureData[idx + 1] = color[1] // G
+        this.textureData[idx + 2] = color[2] // B
+        this.textureData[idx + 3] = color[3] // A
       }
     }
-    
-    this.mesh = new THREE.Mesh()
-    this.mesh.add(group)
-    this.updatePosition()
-    
-    if (this.attributes.visible !== false) {
-      this.scene.add(this.mesh)
-    }
+
+    this.texture.needsUpdate = true
+  }
+
+  /**
+   * Convert hex color to RGBA tuple
+   */
+  private hexToRGBA(hex: number): [number, number, number, number] {
+    return [
+      (hex >> 16) & 0xff, // R
+      (hex >> 8) & 0xff,  // G
+      hex & 0xff,         // B
+      255                 // A (fully opaque)
+    ]
   }
 
   private updatePosition(): void {
     if (!this.mesh) return
-    
+
     // Convert NES screen coordinates to our coordinate system
     const screenX = this.attributes.x - PPU.SCREEN_WIDTH / 2
     const screenY = PPU.SCREEN_HEIGHT / 2 - this.attributes.y
-    
+
     this.mesh.position.set(screenX, screenY, this.attributes.behindBackground ? -0.5 : 0.5)
   }
 
   public update(attributes: Partial<SpriteAttributes>): void {
-    const needsRebuild = 
+    const needsTextureUpdate =
       attributes.tileIndex !== undefined ||
       attributes.paletteIndex !== undefined ||
       attributes.flipX !== undefined ||
@@ -263,36 +307,39 @@ export class Sprite {
 
     Object.assign(this.attributes, attributes)
 
-    if (needsRebuild) {
-      this.destroy()
-      this.createMesh()
-    } else {
-      this.updatePosition()
+    if (needsTextureUpdate) {
+      // Just update texture data - no mesh rebuild!
+      this.updateTexture()
     }
+
+    // Always update position (cheap operation)
+    this.updatePosition()
 
     // Handle visibility
     if (attributes.visible !== undefined && this.mesh) {
-      if (attributes.visible) {
+      if (attributes.visible && !this.isInScene) {
         this.scene.add(this.mesh)
-      } else {
+        this.isInScene = true
+      } else if (!attributes.visible && this.isInScene) {
         this.scene.remove(this.mesh)
+        this.isInScene = false
       }
     }
   }
 
   public destroy(): void {
-    if (this.mesh) {
+    if (this.mesh && this.isInScene) {
       this.scene.remove(this.mesh)
-      this.mesh.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose()
-          if (Array.isArray(child.material)) {
-            child.material.forEach(m => m.dispose())
-          } else {
-            child.material.dispose()
-          }
-        }
-      })
+      this.isInScene = false
+    }
+    if (this.geometry) {
+      this.geometry.dispose()
+    }
+    if (this.material) {
+      this.material.dispose()
+    }
+    if (this.texture) {
+      this.texture.dispose()
     }
   }
 }
