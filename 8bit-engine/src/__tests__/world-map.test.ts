@@ -48,11 +48,16 @@ describe('WorldMap', () => {
     it('should create a world map with nodes', () => {
       const config: WorldMapConfig = {
         nodes: createTestNodes(),
-        startNodeId: 'start'
+        startNodeId: 'start',
+        player: {
+          startNodeId: 'start',
+          sprite: null
+        }
       }
 
       worldMap = new WorldMap(scene, config)
       expect(worldMap).toBeDefined()
+      expect(worldMap.getPlayer()).toBeDefined()
     })
 
     it('should throw error if start node not found', () => {
@@ -64,7 +69,23 @@ describe('WorldMap', () => {
       expect(() => new WorldMap(scene, config)).toThrow()
     })
 
-    it('should start at the specified node', () => {
+    it('should start at the specified node when player provided', () => {
+      const config: WorldMapConfig = {
+        nodes: createTestNodes(),
+        startNodeId: 'start',
+        player: {
+          startNodeId: 'start',
+          sprite: null
+        }
+      }
+
+      worldMap = new WorldMap(scene, config)
+      const currentNode = worldMap.getCurrentNode()
+      
+      expect(currentNode?.id).toBe('start')
+    })
+    
+    it('should return undefined current node when no player', () => {
       const config: WorldMapConfig = {
         nodes: createTestNodes(),
         startNodeId: 'start'
@@ -73,7 +94,7 @@ describe('WorldMap', () => {
       worldMap = new WorldMap(scene, config)
       const currentNode = worldMap.getCurrentNode()
       
-      expect(currentNode?.id).toBe('start')
+      expect(currentNode).toBeUndefined()
     })
   })
 
@@ -81,7 +102,11 @@ describe('WorldMap', () => {
     beforeEach(() => {
       const config: WorldMapConfig = {
         nodes: createTestNodes(),
-        startNodeId: 'start'
+        startNodeId: 'start',
+        player: {
+          startNodeId: 'start',
+          sprite: null
+        }
       }
       worldMap = new WorldMap(scene, config)
     })
@@ -121,7 +146,11 @@ describe('WorldMap', () => {
     beforeEach(() => {
       const config: WorldMapConfig = {
         nodes: createTestNodes(),
-        startNodeId: 'start'
+        startNodeId: 'start',
+        player: {
+          startNodeId: 'start',
+          sprite: null
+        }
       }
       worldMap = new WorldMap(scene, config)
     })
@@ -155,7 +184,11 @@ describe('WorldMap', () => {
     beforeEach(() => {
       const config: WorldMapConfig = {
         nodes: createTestNodes(),
-        startNodeId: 'start'
+        startNodeId: 'start',
+        player: {
+          startNodeId: 'start',
+          sprite: null
+        }
       }
       worldMap = new WorldMap(scene, config)
     })
@@ -181,7 +214,11 @@ describe('WorldMap', () => {
     it('should destroy and clean up scene objects', () => {
       const config: WorldMapConfig = {
         nodes: createTestNodes(),
-        startNodeId: 'start'
+        startNodeId: 'start',
+        player: {
+          startNodeId: 'start',
+          sprite: null
+        }
       }
 
       worldMap = new WorldMap(scene, config)
@@ -227,7 +264,11 @@ describe('WorldMap', () => {
 
       const config: WorldMapConfig = {
         nodes,
-        startNodeId: 'start'
+        startNodeId: 'start',
+        player: {
+          startNodeId: 'start',
+          sprite: null
+        }
       }
 
       worldMap = new WorldMap(scene, config)
@@ -262,7 +303,11 @@ describe('WorldMap', () => {
 
       const config: WorldMapConfig = {
         nodes,
-        startNodeId: 'start'
+        startNodeId: 'start',
+        player: {
+          startNodeId: 'start',
+          sprite: null
+        }
       }
 
       worldMap = new WorldMap(scene, config)

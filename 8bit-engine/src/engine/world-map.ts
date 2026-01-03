@@ -13,6 +13,7 @@
 import * as THREE from 'three'
 import { NES_PALETTE } from './palette'
 import { Input } from './input'
+import { MapPlayer, type MapPlayerConfig } from './map-player'
 
 // =============================================================================
 // NODE TYPES
@@ -76,14 +77,14 @@ export interface WorldMapConfig {
   /** Starting node ID where player begins */
   startNodeId: string
   
+  /** Player configuration (optional - can add player separately) */
+  player?: MapPlayerConfig
+  
   /** Map background color */
   backgroundColor?: number
   
   /** Path line color */
   pathColor?: number
-  
-  /** Player marker color */
-  playerColor?: number
   
   /** Should paths be visible before unlocked? */
   showLockedPaths?: boolean
@@ -96,19 +97,12 @@ export interface WorldMapConfig {
 export class WorldMap {
   private config: WorldMapConfig
   private nodes: Map<string, MapNode>
-  private currentNodeId: string
-  private playerPosition: { x: number; y: number }
+  private player?: MapPlayer
   
   // Three.js objects
   private scene: THREE.Scene
   private nodeObjects: Map<string, THREE.Group> = new Map()
   private pathObjects: THREE.Line[] = []
-  private playerMarker?: THREE.Mesh
-  
-  // Sprite animation
-  private spriteFrameIndex: number = 0
-  private spriteAnimTimer: number = 0
-  private readonly SPRITE_ANIM_SPEED: number = 0.3 // seconds per frame
   
   // Navigation
   private availableDirections: Set<string> = new Set()
@@ -125,10 +119,12 @@ export class WorldMap {
       throw new Error(`Start node "${config.startNodeId}" not found`)
     }
     
-    this.currentNodeId = startNode.id
-    this.playerPosition = { ...startNode.position }
-    
     this.initialize()
+    
+    // Create player if config provided
+    if (config.player) {
+      this.addPlayer(config.player)
+    }
   }
 
   /**
@@ -137,8 +133,37 @@ export class WorldMap {
   private initialize(): void {
     this.createPaths()
     this.createNodes()
-    this.createPlayerMarker()
     this.updateAvailableDirections()
+  }
+  
+  /**
+   * Add a player to the map
+   */
+  public addPlayer(playerConfig: MapPlayerConfig): MapPlayer {
+    // Destroy existing player if present
+    if (this.player) {
+      this.player.destroy()
+    }
+    
+    // Create new player
+    this.player = new MapPlayer(this.scene, playerConfig)
+    
+    // Set initial position
+    const startNode = this.nodes.get(playerConfig.startNodeId)
+    if (startNode) {
+      this.player.teleportTo(startNode.id, startNode.position)
+    }
+    
+    this.updateAvailableDirections()
+    
+    return this.player
+  }
+  
+  /**
+   * Get the player (if one exists)
+   */
+  public getPlayer(): MapPlayer | undefined {
+    return this.player
   }
 
   /**
@@ -242,77 +267,14 @@ export class WorldMap {
   }
 
   /**
-   * Create player marker
-   */
-  private createPlayerMarker(): void {
-    // Load corgi sprite sheet (2x2 grid: 4 frames)
-    const textureLoader = new THREE.TextureLoader()
-    
-    textureLoader.load(
-      '/src/game/sprites/player/corgi_4x4_left_ear_anim.png',
-      (texture) => {
-        // Configure texture for pixel-perfect rendering
-        texture.magFilter = THREE.NearestFilter
-        texture.minFilter = THREE.NearestFilter
-        texture.wrapS = THREE.RepeatWrapping
-        texture.wrapT = THREE.RepeatWrapping
-        
-        // Set up for 2x2 sprite sheet (show one quarter at a time)
-        // Each frame is 0.5 x 0.5 of the texture
-        texture.repeat.set(0.5, 0.5)
-        texture.offset.set(0, 0.5) // Start with top-left frame (frame 0)
-        
-        // Create sprite with corgi texture
-        const geometry = new THREE.PlaneGeometry(1.5, 1.5)
-        const material = new THREE.MeshBasicMaterial({ 
-          map: texture,
-          transparent: true,
-          side: THREE.DoubleSide
-        })
-        
-        this.playerMarker = new THREE.Mesh(geometry, material)
-        this.playerMarker.position.set(
-          this.playerPosition.x,
-          this.playerPosition.y + 0.7,
-          0.5
-        )
-        
-        this.scene.add(this.playerMarker)
-      },
-      undefined,
-      (error) => {
-        console.error('Error loading corgi sprite sheet:', error)
-        // Fallback to colored box if texture fails to load
-        this.createFallbackPlayerMarker()
-      }
-    )
-  }
-
-  /**
-   * Create fallback player marker (colored box)
-   */
-  private createFallbackPlayerMarker(): void {
-    const color = this.config.playerColor || NES_PALETTE.RED
-    const geometry = new THREE.BoxGeometry(0.6, 0.8, 0.6)
-    const material = new THREE.MeshBasicMaterial({ color })
-    
-    this.playerMarker = new THREE.Mesh(geometry, material)
-    this.playerMarker.position.set(
-      this.playerPosition.x,
-      this.playerPosition.y + 0.7,
-      0.5
-    )
-    
-    this.scene.add(this.playerMarker)
-  }
-
-  /**
    * Update which directions the player can move
    */
   private updateAvailableDirections(): void {
     this.availableDirections.clear()
     
-    const currentNode = this.nodes.get(this.currentNodeId)
+    if (!this.player) return
+    
+    const currentNode = this.nodes.get(this.player.getCurrentNodeId())
     if (!currentNode) return
     
     // Can move to any unlocked connected node
@@ -328,13 +290,15 @@ export class WorldMap {
    * Try to move to an adjacent node
    */
   public moveToNode(targetNodeId: string): boolean {
+    if (!this.player) return false
     if (!this.availableDirections.has(targetNodeId)) {
       return false
     }
     
-    this.currentNodeId = targetNodeId
-    const node = this.nodes.get(targetNodeId)!
-    this.playerPosition = { ...node.position }
+    const node = this.nodes.get(targetNodeId)
+    if (!node) return false
+    
+    this.player.teleportTo(targetNodeId, node.position)
     this.updateAvailableDirections()
     
     return true
@@ -344,7 +308,9 @@ export class WorldMap {
    * Find the closest available node in a direction
    */
   public findNodeInDirection(direction: 'up' | 'down' | 'left' | 'right'): string | null {
-    const currentNode = this.nodes.get(this.currentNodeId)
+    if (!this.player) return null
+    
+    const currentNode = this.nodes.get(this.player.getCurrentNodeId())
     if (!currentNode) return null
     
     let bestNode: string | null = null
@@ -381,46 +347,23 @@ export class WorldMap {
    */
   public update(deltaTime: number, input: Input): void {
     this.moveTimer += deltaTime
-    this.spriteAnimTimer += deltaTime
     
-    // Animate sprite frames (cycle through 4 frames)
-    if (this.spriteAnimTimer >= this.SPRITE_ANIM_SPEED) {
-      this.spriteAnimTimer = 0
-      this.spriteFrameIndex = (this.spriteFrameIndex + 1) % 4
-      
-      // Update texture offset based on frame (2x2 grid)
-      // Frame layout: [0][1]
-      //               [2][3]
-      if (this.playerMarker && this.playerMarker.material instanceof THREE.MeshBasicMaterial) {
-        const texture = this.playerMarker.material.map
-        if (texture) {
-          const col = this.spriteFrameIndex % 2  // 0 or 1
-          const row = Math.floor(this.spriteFrameIndex / 2)  // 0 or 1
-          
-          // Set texture offset (origin is bottom-left in Three.js)
-          texture.offset.x = col * 0.5
-          texture.offset.y = (1 - row) * 0.5 - 0.5  // Flip Y coordinate
-        }
-      }
-    }
-    
-    // Animate player marker (bounce)
-    if (this.playerMarker) {
-      const currentNode = this.nodes.get(this.currentNodeId)
-      if (currentNode) {
-        this.playerMarker.position.x = currentNode.position.x
-        this.playerMarker.position.y = currentNode.position.y + 0.7 + Math.sin(this.moveTimer * 5) * 0.02
-      }
+    // Update player animation
+    if (this.player) {
+      this.player.update(deltaTime)
     }
     
     // Highlight current node
-    this.nodeObjects.forEach((obj, id) => {
-      if (id === this.currentNodeId) {
-        obj.scale.setScalar(1 + Math.sin(this.moveTimer * 4) * 0.1)
-      } else {
-        obj.scale.setScalar(1)
-      }
-    })
+    if (this.player) {
+      const currentNodeId = this.player.getCurrentNodeId()
+      this.nodeObjects.forEach((obj, id) => {
+        if (id === currentNodeId) {
+          obj.scale.setScalar(1 + Math.sin(this.moveTimer * 4) * 0.1)
+        } else {
+          obj.scale.setScalar(1)
+        }
+      })
+    }
     
     // Handle input for navigation
     if (input.justPressed('up')) {
@@ -445,7 +388,8 @@ export class WorldMap {
    * Get current node
    */
   public getCurrentNode(): MapNode | undefined {
-    return this.nodes.get(this.currentNodeId)
+    if (!this.player) return undefined
+    return this.nodes.get(this.player.getCurrentNodeId())
   }
 
   /**
@@ -524,16 +468,9 @@ export class WorldMap {
       this.scene.remove(obj)
     })
     
-    // Dispose player marker
-    if (this.playerMarker) {
-      if (this.playerMarker.geometry) this.playerMarker.geometry.dispose()
-      if (this.playerMarker.material instanceof THREE.MeshBasicMaterial) {
-        if (this.playerMarker.material.map) {
-          this.playerMarker.material.map.dispose()
-        }
-        this.playerMarker.material.dispose()
-      }
-      this.scene.remove(this.playerMarker)
+    // Dispose player
+    if (this.player) {
+      this.player.destroy()
     }
     
     this.nodeObjects.clear()

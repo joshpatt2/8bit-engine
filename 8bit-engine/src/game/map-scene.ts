@@ -117,8 +117,13 @@ export function createMapScene(
         startNodeId: 'start',
         backgroundColor: NES_PALETTE.LIME,
         pathColor: NES_PALETTE.TAN,
-        playerColor: NES_PALETTE.RED,
-        showLockedPaths: true
+        showLockedPaths: true,
+        player: {
+          startNodeId: 'start',
+          sprite: '/src/game/sprites/player/corgi_4x4_left_ear_anim.png',
+          color: NES_PALETTE.RED,
+          spriteLayout: { cols: 2, rows: 2 }
+        }
       }
 
       worldMap = new WorldMap(threeScene, mapConfig)
