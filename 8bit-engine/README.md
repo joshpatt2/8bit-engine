@@ -328,19 +328,6 @@ worldMap.completeNode('level1')
 - `start` - Starting point (blue)
 - `goal` - Final destination (yellow)
 
-**Player Sprite:**
-- Supports animated sprite sheets (2x2 grid, 4 frames)
-- Automatic texture loading from `/src/game/sprites/player/`
-- Pixel-perfect rendering with NearestFilter
-- Configurable animation speed
-- Built-in bounce animation for visual appeal
-
-```typescript
-// Player sprite automatically loads from:
-// /src/game/sprites/player/corgi_4x4_left_ear_anim.png
-// and animates through 4 frames in a 2x2 grid
-```
-
 ### Sprite System
 
 NES-authentic sprite system with hardware constraints (OAM).
