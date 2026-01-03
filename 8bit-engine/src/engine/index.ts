@@ -16,6 +16,11 @@ export * from './animated-sprite'
 export * from './map-player'
 export * from './world-map'
 export * from './sprite'
+export * from './entity'
+export * from './component'
+export * from './system'
+export * from './entity-manager'
+export * from './systems'
 export * from './engine'
 
 // Note: SceneRenderer is intentionally NOT exported

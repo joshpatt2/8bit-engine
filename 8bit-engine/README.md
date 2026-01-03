@@ -25,14 +25,15 @@ A TypeScript game engine built on Three.js with authentic NES-style constraints 
 
 ### 🗺️ Game Systems
 
+- **Entity System**: Modern ECS architecture for flexible game object management
 - **WorldMap**: SMB3-style overworld navigation with graph-based node system
 - **Screen System**: State machine for managing game screens (title, map, gameplay, pause)
 - **Scene Manager**: Legacy scene system with lifecycle hooks
 
 ### ✅ Quality Assurance
 
-- **88 Unit Tests**: Comprehensive test coverage with Vitest
-- **100% Passing**: All core modules tested (Input, WorldMap, Bitmap Font, Game)
+- **127 Unit Tests**: Comprehensive test coverage with Vitest
+- **100% Passing**: All core modules tested (Input, WorldMap, Bitmap Font, Game, Entity System)
 - **CI/CD Ready**: Test scripts for continuous integration
 
 ## Installation
@@ -421,6 +422,97 @@ player.setFlip(true, false)  // Face left
 
 See [SPRITES.md](./SPRITES.md) for detailed documentation.
 
+### Entity System
+
+Modern Entity-Component-System (ECS) architecture for game objects.
+
+```typescript
+import {
+  EntityManager,
+  COMPONENT,
+  createTransform,
+  createVelocity,
+  createHealth,
+  MovementSystem,
+  SpriteRenderSystem
+} from './engine'
+
+// Initialize entity manager
+const entityManager = new EntityManager()
+
+// Add systems
+entityManager.getSystemManager()
+  .addSystem(new MovementSystem())
+  .addSystem(new SpriteRenderSystem())
+
+// Create a player entity
+const player = entityManager.createEntity('player')
+  .addComponent(COMPONENT.TRANSFORM, createTransform(0, 0, 0))
+  .addComponent(COMPONENT.VELOCITY, createVelocity(5, 0, 0))
+  .addComponent(COMPONENT.HEALTH, createHealth(100))
+
+// Create an enemy entity
+const enemy = entityManager.createEntity('enemy')
+  .addComponent(COMPONENT.TRANSFORM, createTransform(10, 0, 0))
+  .addComponent(COMPONENT.VELOCITY, createVelocity(-2, 0, 0))
+
+// Update all entities and systems in game loop
+function gameLoop(deltaTime: number) {
+  entityManager.update(deltaTime)
+}
+
+// Query entities
+const enemies = entityManager.getEntitiesByTag('enemy')
+const moveable = entityManager.getEntitiesWithComponents(
+  COMPONENT.TRANSFORM,
+  COMPONENT.VELOCITY
+)
+
+// Destroy an entity (deferred until end of frame)
+entityManager.destroyEntity(enemy.id)
+```
+
+**Core Concepts:**
+- **Entities**: Lightweight objects with unique IDs
+- **Components**: Pure data structures (Transform, Velocity, Health, etc.)
+- **Systems**: Logic that operates on entities with specific components
+- **EntityManager**: Central management for entities and systems
+
+**Built-in Components:**
+- `Transform` - Position, rotation, scale
+- `Velocity` - Linear velocity for movement
+- `Sprite` - Visual representation
+- `Health` - HP and damage state
+- `Collision` - Bounding box collision
+- `Animation` - Frame-based animation
+- `Input` - Player control markers
+
+**Built-in Systems:**
+- `MovementSystem` - Updates positions based on velocity
+- `SpriteRenderSystem` - Syncs meshes with transforms
+- `AnimationSystem` - Updates frame animations
+- `LifetimeSystem` - Auto-destroys entities after duration
+
+**Custom Systems:**
+
+```typescript
+import type { System, Entity } from './engine'
+
+class GravitySystem implements System {
+  public readonly name = 'gravity'
+  public readonly requiredComponents = [COMPONENT.VELOCITY]
+  
+  update(entities: Entity[], deltaTime: number): void {
+    for (const entity of entities) {
+      const velocity = entity.getComponent(COMPONENT.VELOCITY)!
+      velocity.y -= 9.8 * deltaTime // Apply gravity
+    }
+  }
+}
+
+entityManager.getSystemManager().addSystem(new GravitySystem())
+```
+
 ### Screen System
 
 Manage game states with lifecycle hooks and stack-based navigation.
@@ -698,6 +790,7 @@ The `Engine` class provides a simple initialization API that manages rendering, 
 
 Future enhancements:
 - [x] ~~Sprite system (NES OAM)~~ ✅ Complete!
+- [x] ~~Entity-Component-System architecture~~ ✅ Complete!
 - [x] ~~Gamepad support~~ ✅ Complete!
 - [ ] Audio system (NES-style chip tunes)
 - [ ] 8×16 sprite support
@@ -706,7 +799,7 @@ Future enhancements:
 - [ ] Save/load system
 - [ ] Input rebinding/configuration
 - [ ] Touch controls for mobile
-- [ ] Collision detection helpers
+- [ ] Collision detection helpers (integrate with entity system)
 - [ ] More UI components (sliders, progress bars)
 - [ ] Visual scene editor
 
