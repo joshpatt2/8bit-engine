@@ -119,9 +119,20 @@ export function createLevelScene(
     name: config.name as SceneType,
 
     enter() {
-      // Clear scene
+      // Clear scene properly
       while (threeScene.children.length > 0) {
-        threeScene.remove(threeScene.children[0])
+        const obj = threeScene.children[0]
+        if (obj instanceof THREE.Mesh) {
+          if (obj.geometry) obj.geometry.dispose()
+          if (obj.material) {
+            if (Array.isArray(obj.material)) {
+              obj.material.forEach(mat => mat.dispose())
+            } else {
+              obj.material.dispose()
+            }
+          }
+        }
+        threeScene.remove(obj)
       }
 
       platforms = []

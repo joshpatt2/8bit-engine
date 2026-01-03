@@ -494,9 +494,47 @@ export class WorldMap {
    * Clean up all map objects
    */
   public destroy(): void {
-    this.nodeObjects.forEach(obj => this.scene.remove(obj))
-    this.pathObjects.forEach(obj => this.scene.remove(obj))
-    if (this.playerMarker) this.scene.remove(this.playerMarker)
+    // Dispose node objects
+    this.nodeObjects.forEach(obj => {
+      obj.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.geometry) child.geometry.dispose()
+          if (child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach(mat => mat.dispose())
+            } else {
+              child.material.dispose()
+            }
+          }
+        }
+      })
+      this.scene.remove(obj)
+    })
+    
+    // Dispose path objects
+    this.pathObjects.forEach(obj => {
+      if (obj.geometry) obj.geometry.dispose()
+      if (obj.material) {
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach(mat => mat.dispose())
+        } else {
+          obj.material.dispose()
+        }
+      }
+      this.scene.remove(obj)
+    })
+    
+    // Dispose player marker
+    if (this.playerMarker) {
+      if (this.playerMarker.geometry) this.playerMarker.geometry.dispose()
+      if (this.playerMarker.material instanceof THREE.MeshBasicMaterial) {
+        if (this.playerMarker.material.map) {
+          this.playerMarker.material.map.dispose()
+        }
+        this.playerMarker.material.dispose()
+      }
+      this.scene.remove(this.playerMarker)
+    }
     
     this.nodeObjects.clear()
     this.pathObjects = []

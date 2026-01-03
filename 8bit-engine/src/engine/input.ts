@@ -27,10 +27,14 @@ export class Input {
   }
 
   private previousState: InputState = { ...this.state }
+  private boundHandleKeyDown: (e: KeyboardEvent) => void
+  private boundHandleKeyUp: (e: KeyboardEvent) => void
 
   constructor() {
-    window.addEventListener('keydown', this.handleKeyDown.bind(this))
-    window.addEventListener('keyup', this.handleKeyUp.bind(this))
+    this.boundHandleKeyDown = this.handleKeyDown.bind(this)
+    this.boundHandleKeyUp = this.handleKeyUp.bind(this)
+    window.addEventListener('keydown', this.boundHandleKeyDown)
+    window.addEventListener('keyup', this.boundHandleKeyUp)
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
@@ -100,7 +104,7 @@ export class Input {
   }
 
   destroy(): void {
-    window.removeEventListener('keydown', this.handleKeyDown.bind(this))
-    window.removeEventListener('keyup', this.handleKeyUp.bind(this))
+    window.removeEventListener('keydown', this.boundHandleKeyDown)
+    window.removeEventListener('keyup', this.boundHandleKeyUp)
   }
 }

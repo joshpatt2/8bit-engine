@@ -81,7 +81,18 @@ export abstract class BaseScreen implements Screen {
    */
   protected clearScene(): void {
     while (this.scene.children.length > 0) {
-      this.scene.remove(this.scene.children[0])
+      const obj = this.scene.children[0]
+      if (obj instanceof THREE.Mesh) {
+        if (obj.geometry) obj.geometry.dispose()
+        if (obj.material) {
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach(mat => mat.dispose())
+          } else {
+            obj.material.dispose()
+          }
+        }
+      }
+      this.scene.remove(obj)
     }
   }
 

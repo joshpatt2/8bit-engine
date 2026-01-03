@@ -11,6 +11,7 @@ export class ClickHandler {
   private camera: THREE.Camera
   private scene: THREE.Scene
   private canvas: HTMLCanvasElement
+  private boundHandleClick: (event: MouseEvent) => void
 
   constructor(camera: THREE.Camera, scene: THREE.Scene, canvas: HTMLCanvasElement) {
     this.raycaster = new THREE.Raycaster()
@@ -20,7 +21,8 @@ export class ClickHandler {
     this.canvas = canvas
 
     // Bind event listener
-    this.canvas.addEventListener('click', this.handleClick.bind(this))
+    this.boundHandleClick = this.handleClick.bind(this)
+    this.canvas.addEventListener('click', this.boundHandleClick)
   }
 
   private handleClick(event: MouseEvent): void {
@@ -48,6 +50,6 @@ export class ClickHandler {
   }
 
   destroy(): void {
-    this.canvas.removeEventListener('click', this.handleClick.bind(this))
+    this.canvas.removeEventListener('click', this.boundHandleClick)
   }
 }

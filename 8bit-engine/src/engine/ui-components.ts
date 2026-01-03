@@ -128,6 +128,28 @@ export function createButton(options: ButtonOptions): Button {
       group.position.set(x, y, z)
     },
     destroy: () => {
+      // Dispose geometries and materials
+      background.geometry.dispose()
+      if (background.material instanceof THREE.Material) {
+        background.material.dispose()
+      }
+      border.geometry.dispose()
+      if (border.material instanceof THREE.Material) {
+        border.material.dispose()
+      }
+      hitArea.geometry.dispose()
+      if (hitArea.material instanceof THREE.Material) {
+        hitArea.material.dispose()
+      }
+      // Dispose text meshes
+      textMesh.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.geometry) child.geometry.dispose()
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose()
+          }
+        }
+      })
       group.parent?.remove(group)
     },
   }
@@ -205,6 +227,25 @@ export function createTitleCard(options: TitleCardOptions): TitleCard {
       group.position.set(x, y, z)
     },
     destroy: () => {
+      // Dispose text meshes
+      titleMesh.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.geometry) child.geometry.dispose()
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose()
+          }
+        }
+      })
+      if (subtitleMesh) {
+        subtitleMesh.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            if (child.geometry) child.geometry.dispose()
+            if (child.material instanceof THREE.Material) {
+              child.material.dispose()
+            }
+          }
+        })
+      }
       group.parent?.remove(group)
     },
   }
@@ -346,6 +387,15 @@ export function createTextBox(options: TextBoxOptions): TextBox {
     setText: (newText: string) => {
       // Remove old text
       group.remove(textMesh)
+      // Dispose old text
+      textMesh.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.geometry) child.geometry.dispose()
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose()
+          }
+        }
+      })
       // Create new text with same alignment
       textMesh = createBitmapText(newText, {
         color: textColor,
@@ -363,6 +413,25 @@ export function createTextBox(options: TextBoxOptions): TextBox {
       group.position.set(x, y, z)
     },
     destroy: () => {
+      // Dispose all resources
+      background.geometry.dispose()
+      if (background.material instanceof THREE.Material) {
+        background.material.dispose()
+      }
+      if (border) {
+        border.geometry.dispose()
+        if (border.material instanceof THREE.Material) {
+          border.material.dispose()
+        }
+      }
+      textMesh.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.geometry) child.geometry.dispose()
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose()
+          }
+        }
+      })
       group.parent?.remove(group)
     },
   }
@@ -412,6 +481,15 @@ export function createLabel(options: LabelOptions): Label {
       const position = textMesh.position.clone()
       
       parent?.remove(textMesh)
+      // Dispose old text
+      textMesh.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.geometry) child.geometry.dispose()
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose()
+          }
+        }
+      })
       textMesh = createBitmapText(newText, {
         color: opts.color,
         scale: opts.scale,
@@ -427,6 +505,14 @@ export function createLabel(options: LabelOptions): Label {
       textMesh.position.set(x, y, z)
     },
     destroy: () => {
+      textMesh.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          if (child.geometry) child.geometry.dispose()
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose()
+          }
+        }
+      })
       textMesh.parent?.remove(textMesh)
     },
   }
@@ -533,6 +619,17 @@ export function createMenu(options: MenuOptions): Menu {
       group.position.set(x, y, z)
     },
     destroy: () => {
+      // Dispose all option meshes
+      optionMeshes.forEach(mesh => {
+        mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            if (child.geometry) child.geometry.dispose()
+            if (child.material instanceof THREE.Material) {
+              child.material.dispose()
+            }
+          }
+        })
+      })
       group.parent?.remove(group)
     },
   }
