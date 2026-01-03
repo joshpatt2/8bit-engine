@@ -15,6 +15,8 @@
 
 import * as THREE from 'three'
 import { BaseScreen } from './screen'
+import { SceneRenderer } from './scene-renderer'
+import { Input } from './input'
 import { NES_PALETTE } from './palette'
 import { createBitmapText, BitmapTextStyles } from './bitmap-font'
 import { createButton, type Button } from './ui-components'
@@ -70,13 +72,11 @@ export class TitleScreen extends BaseScreen {
 
   constructor(
     name: string,
-    scene: THREE.Scene,
-    camera: THREE.Camera,
-    renderer: THREE.WebGLRenderer,
-    input: any,
+    renderer: SceneRenderer,
+    input: Input,
     config: TitleScreenConfig
   ) {
-    super(name, scene, camera, renderer, input)
+    super(name, renderer, input)
     
     // Apply defaults
     this.config = {
@@ -100,7 +100,9 @@ export class TitleScreen extends BaseScreen {
     this.enableClickHandling()
     
     // Allow game to setup custom visual elements
-    this.config.onSetupVisuals(this.scene)
+    // Get THREE.Scene for advanced usage (callback API)
+    const threeScene = this.renderer.getThreeScene()
+    this.config.onSetupVisuals(threeScene)
     
     // Create core UI elements
     this.createTitle()
@@ -150,7 +152,7 @@ export class TitleScreen extends BaseScreen {
       BitmapTextStyles.title(this.config.titleColor)
     )
     this.titleText.position.set(0, 2, 0)
-    this.scene.add(this.titleText)
+    this.addToScene(this.titleText)
   }
 
   private createMenu(): void {
@@ -176,7 +178,7 @@ export class TitleScreen extends BaseScreen {
       })
       
       button.setPosition(0, startY + (index * spacing), 0)
-      this.scene.add(button.group)
+      this.addToScene(button.group)
       this.menuButtons.set(option.id, button)
     })
   }
