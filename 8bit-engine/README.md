@@ -32,7 +32,7 @@ A TypeScript game engine built on Three.js with authentic NES-style constraints 
 
 ### ✅ Quality Assurance
 
-- **71 Unit Tests**: Comprehensive test coverage with Vitest
+- **87 Unit Tests**: Comprehensive test coverage with Vitest
 - **100% Passing**: All core modules tested (Input, WorldMap, Bitmap Font, Game)
 - **CI/CD Ready**: Test scripts for continuous integration
 
@@ -196,24 +196,46 @@ const input = new Input()
 
 // Check if button is currently pressed
 if (input.isPressed('a')) {
-  // A button (Z key or Enter)
+  // A button (Z/Space key or gamepad button)
 }
 
 // Check if button was just pressed this frame
 if (input.justPressed('start')) {
-  // Start button (Enter key)
+  // Start button (Enter key or gamepad start)
 }
+
+// Check if button was just released
+if (input.justReleased('a')) {
+  // For variable jump height, etc.
+}
+
+// Check if any directional input is active
+if (input.isMoving()) {
+  // Player is moving
+}
+
+// Get direction vector
+const dir = input.getDirection()  // { x: -1/0/1, y: -1/0/1 }
 
 // Update input state (call once per frame)
 input.update()
 ```
 
-**Button Mappings:**
+**Keyboard Mappings:**
 - **Arrows/WASD** → D-Pad (up, down, left, right)
 - **Z/Space** → A button
 - **X** → B button
 - **Enter** → Start
 - **Shift** → Select
+
+**Gamepad Support:**
+- **D-Pad** → Directional input
+- **Left Stick** → Directional input (with dead zone)
+- **A/✕** → A button
+- **B/○, X/□, Y/△** → A or B button
+- **Start/Options** → Start
+- **Select/Share** → Select
+- **Hot-plugging** → Automatically detects gamepad connection/disconnection
 
 ### Bitmap Font
 
@@ -713,12 +735,14 @@ Use Screens for cleaner code and better lifecycle management.
 
 Future enhancements:
 - [x] ~~Sprite system (NES OAM)~~ ✅ Complete!
+- [x] ~~Gamepad support~~ ✅ Complete!
 - [ ] Audio system (NES-style chip tunes)
 - [ ] 8×16 sprite support
 - [ ] Tilemap renderer with scrolling
 - [ ] Particle effects
 - [ ] Save/load system
-- [ ] Gamepad support
+- [ ] Input rebinding/configuration
+- [ ] Touch controls for mobile
 - [ ] Collision detection helpers
 - [ ] More UI components (sliders, progress bars)
 - [ ] Visual scene editor
