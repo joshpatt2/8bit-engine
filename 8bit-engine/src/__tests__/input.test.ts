@@ -76,6 +76,12 @@ describe('Input', () => {
       window.dispatchEvent(shiftEvent)
       expect(input.isPressed('select')).toBe(true)
     })
+
+    it('should map Space to B button', () => {
+      const spaceEvent = new KeyboardEvent('keydown', { key: ' ' })
+      window.dispatchEvent(spaceEvent)
+      expect(input.isPressed('b')).toBe(true)
+    })
   })
 
   describe('justPressed', () => {
@@ -130,6 +136,23 @@ describe('Input', () => {
       expect(input.isPressed('right')).toBe(true)
       expect(input.isPressed('a')).toBe(true)
     })
+
+    it('should map both X and Space to B button', () => {
+      // Test X key
+      const xEvent = new KeyboardEvent('keydown', { key: 'x' })
+      window.dispatchEvent(xEvent)
+      expect(input.isPressed('b')).toBe(true)
+
+      // Release X
+      const xUpEvent = new KeyboardEvent('keyup', { key: 'x' })
+      window.dispatchEvent(xUpEvent)
+      expect(input.isPressed('b')).toBe(false)
+
+      // Test Space key
+      const spaceEvent = new KeyboardEvent('keydown', { key: ' ' })
+      window.dispatchEvent(spaceEvent)
+      expect(input.isPressed('b')).toBe(true)
+    })
   })
 
   describe('Edge Cases', () => {
@@ -152,6 +175,83 @@ describe('Input', () => {
       }
 
       expect(() => input.isPressed('a')).not.toThrow()
+    })
+  })
+
+  describe('Utility Methods', () => {
+    it('should detect movement with isMoving', () => {
+      expect(input.isMoving()).toBe(false)
+
+      const upEvent = new KeyboardEvent('keydown', { key: 'ArrowUp' })
+      window.dispatchEvent(upEvent)
+      expect(input.isMoving()).toBe(true)
+
+      const upRelease = new KeyboardEvent('keyup', { key: 'ArrowUp' })
+      window.dispatchEvent(upRelease)
+      expect(input.isMoving()).toBe(false)
+    })
+
+    it('should get direction vector with getDirection', () => {
+      let dir = input.getDirection()
+      expect(dir).toEqual({ x: 0, y: 0 })
+
+      // Right
+      const rightEvent = new KeyboardEvent('keydown', { key: 'ArrowRight' })
+      window.dispatchEvent(rightEvent)
+      dir = input.getDirection()
+      expect(dir).toEqual({ x: 1, y: 0 })
+
+      // Down + Right (diagonal)
+      const downEvent = new KeyboardEvent('keydown', { key: 'ArrowDown' })
+      window.dispatchEvent(downEvent)
+      dir = input.getDirection()
+      expect(dir).toEqual({ x: 1, y: 1 })
+
+      // Left (cancels right)
+      const leftEvent = new KeyboardEvent('keydown', { key: 'ArrowLeft' })
+      window.dispatchEvent(leftEvent)
+      dir = input.getDirection()
+      expect(dir).toEqual({ x: 0, y: 1 })
+    })
+
+    it('should return readonly state with getState', () => {
+      const state = input.getState()
+      expect(state.up).toBe(false)
+
+      const upEvent = new KeyboardEvent('keydown', { key: 'ArrowUp' })
+      window.dispatchEvent(upEvent)
+
+      const newState = input.getState()
+      expect(newState.up).toBe(true)
+    })
+  })
+
+  describe('justReleased', () => {
+    it('should detect button release', () => {
+      const downEvent = new KeyboardEvent('keydown', { key: 'z' })
+      window.dispatchEvent(downEvent)
+      input.update()
+      
+      expect(input.justReleased('a')).toBe(false)
+      
+      const upEvent = new KeyboardEvent('keyup', { key: 'z' })
+      window.dispatchEvent(upEvent)
+      
+      expect(input.justReleased('a')).toBe(true)
+      
+      input.update()
+      expect(input.justReleased('a')).toBe(false)
+    })
+  })
+
+  describe('Cleanup', () => {
+    it('should cleanup event listeners on destroy', () => {
+      input.destroy()
+      
+      const event = new KeyboardEvent('keydown', { key: 'ArrowUp' })
+      window.dispatchEvent(event)
+      
+      expect(input.isPressed('up')).toBe(false)
     })
   })
 })

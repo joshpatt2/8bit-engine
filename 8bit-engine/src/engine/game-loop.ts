@@ -6,12 +6,13 @@
 export interface GameLoopCallbacks {
   update: (deltaTime: number) => void
   render: () => void
+  targetFPS?: number  // Optional target FPS (default: 60)
 }
 
 export class GameLoop {
   private lastTime: number = 0
   private accumulator: number = 0
-  private readonly fixedDeltaTime: number = 1000 / 60 // ~16.67ms for 60 FPS
+  private readonly fixedDeltaTime: number
   private running: boolean = false
   private frameId: number = 0
 
@@ -23,6 +24,9 @@ export class GameLoop {
 
   constructor(callbacks: GameLoopCallbacks) {
     this.callbacks = callbacks
+    // Support optional targetFPS (default: 60)
+    const targetFPS = callbacks.targetFPS ?? 60
+    this.fixedDeltaTime = 1000 / targetFPS
     this.loop = this.loop.bind(this)
   }
 
@@ -75,5 +79,14 @@ export class GameLoop {
 
   isRunning(): boolean {
     return this.running
+  }
+
+  /**
+   * Manually step the game loop (for testing)
+   * @param deltaTime Time in milliseconds
+   */
+  step(deltaTime: number = this.fixedDeltaTime): void {
+    this.callbacks.update(deltaTime / 1000) // Convert to seconds
+    this.callbacks.render()
   }
 }

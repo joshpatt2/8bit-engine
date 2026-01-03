@@ -1,9 +1,9 @@
 /**
  * Game Scenes / State Machine
- * Manages transitions between title, map, and levels
+ * Manages transitions between different game states/screens
  */
 
-export type SceneType = 'title' | 'map' | 'level1' | 'level2' | 'level3'
+export type SceneType = string
 
 export interface Scene {
   name: SceneType

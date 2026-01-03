@@ -21,3 +21,7 @@ export * from './component'
 export * from './system'
 export * from './entity-manager'
 export * from './systems'
+export * from './engine'
+
+// Note: SceneRenderer is intentionally NOT exported
+// It's an internal implementation detail
