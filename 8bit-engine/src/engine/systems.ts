@@ -124,7 +124,7 @@ export function createLifetime(duration: number): LifetimeComponent {
  */
 export class LifetimeSystem implements System {
   public readonly name = 'lifetime'
-  public readonly requiredComponents = ['lifetime']
+  public readonly requiredComponents = [COMPONENT.LIFETIME]
   
   private entitiesToDestroy: Entity[] = []
   
@@ -132,7 +132,7 @@ export class LifetimeSystem implements System {
     this.entitiesToDestroy = []
     
     for (const entity of entities) {
-      const lifetime = entity.getComponent<LifetimeComponent>('lifetime')!
+      const lifetime = entity.getComponent<LifetimeComponent>(COMPONENT.LIFETIME)!
       lifetime.remaining -= deltaTime
       
       if (lifetime.remaining <= 0) {

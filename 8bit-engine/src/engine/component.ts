@@ -19,6 +19,7 @@ export const COMPONENT = {
   COLLISION: 'collision',
   INPUT: 'input',
   ANIMATION: 'animation',
+  LIFETIME: 'lifetime',
 } as const
 
 // =============================================================================

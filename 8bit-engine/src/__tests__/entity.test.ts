@@ -443,7 +443,7 @@ describe('Built-in Systems', () => {
   describe('LifetimeSystem', () => {
     it('should destroy entities after lifetime expires', () => {
       const entity = new Entity()
-      entity.addComponent('lifetime', createLifetime(1.0))
+      entity.addComponent(COMPONENT.LIFETIME, createLifetime(1.0))
       
       const system = new LifetimeSystem()
       
