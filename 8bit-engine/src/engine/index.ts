@@ -16,5 +16,7 @@ export * from './animated-sprite'
 export * from './map-player'
 export * from './world-map'
 export * from './sprite'
-export * from './scenes'
-export * from './game'
+export * from './engine'
+
+// Note: SceneRenderer is intentionally NOT exported
+// It's an internal implementation detail
