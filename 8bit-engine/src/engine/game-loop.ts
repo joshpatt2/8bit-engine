@@ -80,4 +80,13 @@ export class GameLoop {
   isRunning(): boolean {
     return this.running
   }
+
+  /**
+   * Manually step the game loop (for testing)
+   * @param deltaTime Time in milliseconds
+   */
+  step(deltaTime: number = this.fixedDeltaTime): void {
+    this.callbacks.update(deltaTime / 1000) // Convert to seconds
+    this.callbacks.render()
+  }
 }
