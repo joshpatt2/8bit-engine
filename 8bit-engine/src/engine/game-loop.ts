@@ -62,6 +62,8 @@ export class GameLoop {
 
     // Fixed timestep updates
     this.accumulator += frameTime
+    // Cap accumulator to prevent death spiral after long pauses (e.g., tab switching)
+    this.accumulator = Math.min(this.accumulator, this.fixedDeltaTime * 5)
     while (this.accumulator >= this.fixedDeltaTime) {
       this.callbacks.update(this.fixedDeltaTime / 1000) // Convert to seconds
       this.accumulator -= this.fixedDeltaTime
